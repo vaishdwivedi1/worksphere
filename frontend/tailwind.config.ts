@@ -1,0 +1,101 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  theme: {
+    extend: {
+      colors: {
+        // Text colors
+        "text-primary": "var(--text-primary)",
+        "text-secondary": "var(--text-secondary)",
+        "text-tertiary": "var(--text-tertiary)",
+        "text-muted": "var(--text-muted)",
+        "text-inverse": "var(--text-inverse)",
+        "text-link": "var(--text-link)",
+        "text-link-hover": "var(--text-link-hover)",
+        "text-heading": "var(--text-heading)",
+        "text-body": "var(--text-body)",
+        "text-success": "var(--text-success)",
+        "text-warning": "var(--text-warning)",
+        "text-error": "var(--text-error)",
+        "text-info": "var(--text-info)",
+
+        // Backgrounds
+        "bg-primary": "var(--bg-primary)",
+        "bg-secondary": "var(--bg-secondary)",
+        "bg-tertiary": "var(--bg-tertiary)",
+        "bg-muted": "var(--bg-muted)",
+        "bg-card": "var(--bg-card)",
+        "bg-card-hover": "var(--bg-card-hover)",
+        "bg-input": "var(--bg-input)",
+        "bg-input-hover": "var(--bg-input-hover)",
+        "bg-input-disabled": "var(--bg-input-disabled)",
+        "bg-sidebar": "var(--bg-sidebar)",
+        "bg-navbar": "var(--bg-navbar)",
+        "bg-modal": "var(--bg-modal)",
+        "bg-dropdown": "var(--bg-dropdown)",
+
+        // Borders
+        "border-primary": "var(--border-primary)",
+        "border-secondary": "var(--border-secondary)",
+        "border-muted": "var(--border-muted)",
+        "border-focus": "var(--border-focus)",
+        "border-error": "var(--border-error)",
+        "border-success": "var(--border-success)",
+
+        // Buttons
+        "btn-primary": "var(--btn-primary-bg)",
+        "btn-primary-hover": "var(--btn-primary-hover)",
+        "btn-primary-active": "var(--btn-primary-active)",
+        "btn-primary-text": "var(--btn-primary-text)",
+        "btn-secondary": "var(--btn-secondary-bg)",
+        "btn-secondary-hover": "var(--btn-secondary-hover)",
+        "btn-secondary-active": "var(--btn-secondary-active)",
+        "btn-secondary-text": "var(--btn-secondary-text)",
+        "btn-outline": "var(--btn-outline-border)",
+        "btn-outline-text": "var(--btn-outline-text)",
+        "btn-outline-hover": "var(--btn-outline-hover)",
+        "btn-outline-hover-text": "var(--btn-outline-hover-text)",
+        "btn-success": "var(--btn-success-bg)",
+        "btn-success-hover": "var(--btn-success-hover)",
+        "btn-success-text": "var(--btn-success-text)",
+        "btn-danger": "var(--btn-danger-bg)",
+        "btn-danger-hover": "var(--btn-danger-hover)",
+        "btn-danger-text": "var(--btn-danger-text)",
+        "btn-warning": "var(--btn-warning-bg)",
+        "btn-warning-hover": "var(--btn-warning-hover)",
+        "btn-warning-text": "var(--btn-warning-text)",
+        "btn-ghost": "var(--btn-ghost-text)",
+        "btn-ghost-hover": "var(--btn-ghost-hover)",
+        "btn-disabled": "var(--btn-disabled-bg)",
+        "btn-disabled-text": "var(--btn-disabled-text)",
+
+        // Chips
+        "chip-bg": "var(--chip-bg)",
+        "chip-text": "var(--chip-text)",
+        "chip-close-hover": "var(--chip-close-hover)",
+
+        // Alerts
+        "alert-info": "var(--alert-info-bg)",
+        "alert-info-border": "var(--alert-info-border)",
+        "alert-info-text": "var(--alert-info-text)",
+        "alert-success": "var(--alert-success-bg)",
+        "alert-success-border": "var(--alert-success-border)",
+        "alert-success-text": "var(--alert-success-text)",
+        "alert-warning": "var(--alert-warning-bg)",
+        "alert-warning-border": "var(--alert-warning-border)",
+        "alert-warning-text": "var(--alert-warning-text)",
+        "alert-error": "var(--alert-error-bg)",
+        "alert-error-border": "var(--alert-error-border)",
+        "alert-error-text": "var(--alert-error-text)",
+      },
+      fontFamily: {
+        sans: ["Inter", "system-ui", "sans-serif"],
+      },
+      boxShadow: {
+        card: "0 1px 3px var(--card-shadow)",
+        "card-hover": "0 4px 12px var(--card-hover-shadow)",
+      },
+    },
+  },
+  plugins: [],
+};
