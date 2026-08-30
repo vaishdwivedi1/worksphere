@@ -5,6 +5,7 @@ import Home from "../pages/Home";
 import MainLayout from "../layouts/MainLayout";
 import STATICPATHS from "../utils/STATICPATHS";
 import RegisterOrganization from "../pages/RegisterOrganization";
+import Dashboard from "../pages/Dashboard";
 
 // ============================================
 // ERROR BOUNDARY
@@ -96,6 +97,7 @@ const Routing = () => {
                 </div>
               }
             />
+            <Route path={STATICPATHS.dashboard} element={<Dashboard />} />
             <Route
               path="employees"
               element={
