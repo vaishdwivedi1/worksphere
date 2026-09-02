@@ -1,8 +1,8 @@
-// src/components/RegisterOrganization.jsx
-import React, { useState } from "react";
-import { api } from "../services/api";
+import { useState } from "react";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
+import { useNavigate } from "react-router-dom";
+import { api } from "../services/api";
 import APIPATHS from "../utils/APIPATHS";
 import STATICPATHS from "../utils/STATICPATHS";
 
@@ -11,10 +11,10 @@ const RegisterOrganization = () => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  const navigate = useNavigate();
   // Form data
   const [formData, setFormData] = useState({
     company_name: "",
@@ -206,7 +206,6 @@ const RegisterOrganization = () => {
     e.preventDefault();
     setLoading(true);
     setError("");
-    setSuccess("");
 
     const validationError = validateForm();
     if (validationError) {
@@ -223,7 +222,6 @@ const RegisterOrganization = () => {
       const response = await api.post(APIPATHS.createOrganization, requestData);
 
       if (response.success) {
-        setSuccess("OTP sent successfully! Please check your email and phone.");
         setStep(2);
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
@@ -242,7 +240,6 @@ const RegisterOrganization = () => {
     e.preventDefault();
     setLoading(true);
     setError("");
-    setSuccess("");
 
     const validationError = validateOtp();
     if (validationError) {
@@ -260,15 +257,13 @@ const RegisterOrganization = () => {
       verifyData.company_logo = logoBase64 || "";
 
       const response = await api.post(APIPATHS.verifyOrganization, verifyData);
-      console.log({ response });
 
       if (response.success) {
-        setSuccess("Organization created successfully!");
         if (response.data?.token) {
           localStorage.setItem("authToken", response.data.token);
           localStorage.setItem("user", JSON.stringify(response.data.user));
         }
-        navigate(STATICPATHS.dashboard);
+        navigate(STATICPATHS.login);
         setTimeout(() => {
           setFormData({
             company_name: "",
@@ -289,7 +284,6 @@ const RegisterOrganization = () => {
             phone_otp: "",
           });
           setStep(1);
-          setSuccess("");
         }, 3000);
       } else {
         setError(response.message || "OTP verification failed");
@@ -306,14 +300,12 @@ const RegisterOrganization = () => {
   const handleBack = () => {
     setStep(1);
     setError("");
-    setSuccess("");
   };
 
   // Resend OTP
   const handleResendOTP = async () => {
     setLoading(true);
     setError("");
-    setSuccess("");
 
     try {
       const requestData = { ...formData };
@@ -323,7 +315,6 @@ const RegisterOrganization = () => {
       const response = await api.post(APIPATHS.createOrganization, requestData);
 
       if (response.success) {
-        setSuccess("OTP resent successfully!");
       } else {
         setError(response.message || "Failed to resend OTP");
       }

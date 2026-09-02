@@ -1,11 +1,12 @@
 import React from "react";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
-import PublicLayout from "../layouts/PublicLayout";
-import Home from "../pages/Home";
 import MainLayout from "../layouts/MainLayout";
-import STATICPATHS from "../utils/STATICPATHS";
-import RegisterOrganization from "../pages/RegisterOrganization";
+import PublicLayout from "../layouts/PublicLayout";
 import Dashboard from "../pages/Dashboard";
+import Home from "../pages/Home";
+import Login from "../pages/Login";
+import RegisterOrganization from "../pages/RegisterOrganization";
+import STATICPATHS from "../utils/STATICPATHS";
 
 // ============================================
 // ERROR BOUNDARY
@@ -78,6 +79,7 @@ const Routing = () => {
             path={STATICPATHS.registerOrganization}
             element={<RegisterOrganization />}
           />
+          <Route path={STATICPATHS.login} element={<Login />} />
 
           {/* Protected Routes (With Sidebar) */}
           <Route

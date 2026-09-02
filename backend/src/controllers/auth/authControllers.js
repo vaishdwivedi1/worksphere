@@ -330,19 +330,6 @@ export const verifyAndCreateOrganization = async (req, res) => {
 
     await client.query("COMMIT");
 
-    // Generate JWT token
-    const token = jwt.sign(
-      {
-        userId,
-        email: owner_email,
-        organizationId,
-        role: "owner",
-        name: owner_name,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" },
-    );
-
     // Return success
     return res.status(201).json({
       success: true,
@@ -360,7 +347,7 @@ export const verifyAndCreateOrganization = async (req, res) => {
           company_name: company_name,
           plan: plan.toUpperCase(),
         },
-        token,
+        // token,
       },
       timestamp: new Date().toISOString(),
     });
@@ -381,6 +368,78 @@ export const verifyAndCreateOrganization = async (req, res) => {
 // POST /auth/login
 export const loginUser = async (req, res) => {
   const { email, password } = req.body;
+
+  // 1. Check required fields
+  if (!email || !password) {
+    return handleError(res, 400, "Invalid data", null, "loginUser");
+  }
+
+  // 2. Validate email
+  if (!isValidEmail(email)) {
+    return handleError(res, 400, "Invalid email format", null, "loginUser");
+  }
+
+  // 3. Find user by email
+  const result = await pool.query(`SELECT * FROM users WHERE email = $1`, [
+    email,
+  ]);
+
+  // 4. Check user exists
+  const user = result.rows[0];
+
+  if (!user) {
+    return handleError(res, 400, "User not found", null, "loginUser");
+  }
+
+  // 5. Compare entered password with hashed password
+  const isPassCorrect = await bcrypt.compare(password, user.password_hash);
+
+  // 6. Check password
+  if (!isPassCorrect) {
+    return handleError(res, 400, "Invalid credentials", null, "loginUser");
+  }
+
+  const orgResult = await pool.query(
+    `SELECT 
+      o.id,
+      o.company_name,
+      o.plan,
+      om.role
+   FROM organizations o
+   INNER JOIN organization_members om 
+      ON o.id = om.organization_id
+   WHERE om.user_id = $1 
+      AND om.status = 'active'`,
+    [user.id],
+  );
+
+  const organization = orgResult.rows[0];
+
+  const token = jwt.sign(
+    {
+      userId: user.id,
+      email: user.email,
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: "7d",
+    },
+  );
+
+  // 9. Don't send password hash to frontend
+  delete user.password_hash;
+
+  return res.status(200).json({
+    success: true,
+    statusCode: 200,
+    message: "User logged in successfully",
+    data: {
+      user,
+      organization: organization || null,
+      token,
+    },
+    timestamp: new Date().toISOString(),
+  });
 };
 
 // Other functions (keep as is)
