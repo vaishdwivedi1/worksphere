@@ -14,10 +14,24 @@ import {
   Target,
   Users,
   X,
-  Zap,
+  UserCog,
+  Building2,
+  Calendar,
+  Megaphone,
+  Gauge,
+  UserCheck,
+  Award,
+  Code,
+  FolderGit,
+  GitBranch,
+  CheckSquare,
+  ListTodo,
+  FileText,
+  Rocket,
+  Layers,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
@@ -25,6 +39,7 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = React.useState<any>(null);
   const [showPlanDetails, setShowPlanDetails] = React.useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Get user data from localStorage
   useEffect(() => {
@@ -67,6 +82,72 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // Role-based sidebar menu items
+  const getRoleMenus = (role: string) => {
+    const roleMenus: Record<string, any[]> = {
+      owner: [
+        { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+        { icon: Building2, label: "Organization", path: "/organization" },
+        { icon: Users, label: "Members", path: "/members" },
+        { icon: UserCog, label: "Teams", path: "/teams" },
+        { icon: Users, label: "HR", path: "/hr" },
+        { icon: Gauge, label: "Sales", path: "/sales" },
+        { icon: Megaphone, label: "Marketing", path: "/marketing" },
+        { icon: Code, label: "Development", path: "/development" },
+        { icon: BarChart3, label: "Reports", path: "/reports" },
+        { icon: Settings, label: "Settings", path: "/settings" },
+      ],
+      admin: [
+        { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+        { icon: Users, label: "Members", path: "/members" },
+        { icon: UserCog, label: "Teams", path: "/teams" },
+        { icon: Users, label: "HR", path: "/hr" },
+        { icon: Gauge, label: "Sales", path: "/sales" },
+        { icon: Megaphone, label: "Marketing", path: "/marketing" },
+        { icon: Code, label: "Development", path: "/development" },
+        { icon: BarChart3, label: "Reports", path: "/reports" },
+      ],
+      hr: [
+        { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+        { icon: Users, label: "Employees", path: "/employees" },
+        { icon: Calendar, label: "Leave", path: "/leave" },
+        { icon: Megaphone, label: "Announcements", path: "/announcements" },
+        { icon: Briefcase, label: "Jobs", path: "/jobs" },
+        { icon: BarChart3, label: "HR Reports", path: "/hr-reports" },
+      ],
+      developer: [
+        { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+        { icon: FolderGit, label: "Projects", path: "/projects" },
+        { icon: GitBranch, label: "Sprints", path: "/sprints" },
+        { icon: ListTodo, label: "Tasks", path: "/tasks" },
+        { icon: CheckSquare, label: "TODO", path: "/todo" },
+        { icon: FileText, label: "Documents", path: "/documents" },
+        { icon: Rocket, label: "Releases", path: "/releases" },
+      ],
+      sales: [
+        { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+        { icon: Gauge, label: "Leads", path: "/leads" },
+        { icon: UserCheck, label: "Assign/Reassign", path: "/assign-reassign" },
+        { icon: BarChart3, label: "Sales Analytics", path: "/sales-analytics" },
+        { icon: Award, label: "Performance", path: "/performance" },
+      ],
+      marketing: [
+        { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+        { icon: Megaphone, label: "Campaigns", path: "/campaigns" },
+        {
+          icon: BarChart3,
+          label: "Campaign Analytics",
+          path: "/campaign-analytics",
+        },
+        { icon: Layers, label: "Campaign Details", path: "/campaign-details" },
+      ],
+    };
+    return roleMenus[role] || roleMenus.owner;
+  };
+
+  const userRole = user?.role || "owner";
+  const menuItems = getRoleMenus(userRole);
 
   // Plan details
   const currentPlan = user?.plan || "FREE";
@@ -126,7 +207,7 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <span className="bg-black text-white p-1.5 rounded-lg transition-colors">
             ◆
           </span>
-          <span className="text-black">WorkSphere</span>
+          {sidebarOpen ? <span className="text-black">WorkSphere</span> : null}
         </div>
         <button
           onClick={toggleSidebar}
@@ -148,126 +229,118 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <div className="w-10 h-10 rounded-full bg-black flex items-center justify-center text-white font-semibold text-sm">
             {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-black truncate">
-              {user?.name || "User"}
-            </p>
-            <p className="text-xs text-gray-500 truncate">
-              {user?.email || "user@email.com"}
-            </p>
-          </div>
+
+          {sidebarOpen ? (
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-black truncate">
+                {user?.name || "User"}
+              </p>
+              <p className="text-xs text-gray-500 truncate">
+                {user?.email || "user@email.com"}
+              </p>
+              <p className="text-xs text-gray-400 capitalize">
+                Role: {userRole}
+              </p>
+            </div>
+          ) : null}
         </div>
       </div>
 
       {/* Plan Section */}
-      <div className="px-3 py-3 border-b border-gray-200">
-        <div
-          className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${currentPlanData.bgColor} border ${currentPlanData.borderColor}`}
-          onClick={() => setShowPlanDetails(!showPlanDetails)}
-        >
-          <div className="flex items-center gap-2">
-            <PlanIcon className={`w-4 h-4 ${currentPlanData.color}`} />
-            <div>
-              <p className="text-xs font-medium text-black">
-                {currentPlanData.name}
-              </p>
-              <p className="text-[10px] text-gray-500">
-                {currentPlanData.price}
-              </p>
+      {sidebarOpen && (
+        <div className="px-3 py-3 border-b border-gray-200">
+          <div
+            className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${currentPlanData.bgColor} border ${currentPlanData.borderColor}`}
+            onClick={() => setShowPlanDetails(!showPlanDetails)}
+          >
+            <div className="flex items-center gap-2">
+              <PlanIcon className={`w-4 h-4 ${currentPlanData.color}`} />
+              <div>
+                <p className="text-xs font-medium text-black">
+                  {currentPlanData.name}
+                </p>
+                <p className="text-[10px] text-gray-500">
+                  {currentPlanData.price}
+                </p>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-1">
-            {currentPlan !== "PREMIUM" && (
-              <span className="text-[10px] font-medium text-black bg-white px-2 py-0.5 rounded-full border border-gray-200">
-                Upgrade
-              </span>
-            )}
-            <ChevronRight
-              className={`w-4 h-4 text-gray-400 transition-transform ${
-                showPlanDetails ? "rotate-90" : ""
-              }`}
-            />
-          </div>
-        </div>
-
-        {/* Plan Details Dropdown */}
-        {showPlanDetails && (
-          <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-black">Plan Features:</p>
-              {currentPlanData.features.map((feature, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center gap-2 text-xs text-gray-600"
-                >
-                  <span className="w-1 h-1 rounded-full bg-black" />
-                  {feature}
-                </div>
-              ))}
+            <div className="flex items-center gap-1">
               {currentPlan !== "PREMIUM" && (
-                <button
-                  className="w-full mt-2 bg-black text-white text-xs font-medium py-1.5 rounded-lg hover:bg-gray-800 transition-all"
-                  onClick={() => {
-                    // Handle upgrade logic
-                    alert(`Upgrade to ${currentPlanData.nextPlan} plan`);
-                  }}
-                >
-                  Upgrade to {currentPlanData.nextPlan}
-                </button>
+                <span className="text-[10px] font-medium text-black bg-white px-2 py-0.5 rounded-full border border-gray-200">
+                  Upgrade
+                </span>
               )}
-              {currentPlan === "PREMIUM" && (
-                <div className="mt-1 text-xs text-purple-600 font-medium flex items-center gap-1">
-                  <Crown className="w-3 h-3" />
-                  You're on the best plan!
-                </div>
-              )}
+              <ChevronRight
+                className={`w-4 h-4 text-gray-400 transition-transform ${
+                  showPlanDetails ? "rotate-90" : ""
+                }`}
+              />
             </div>
           </div>
-        )}
-      </div>
+
+          {/* Plan Details Dropdown */}
+          {showPlanDetails && (
+            <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-black">Plan Features:</p>
+                {currentPlanData.features.map((feature, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-2 text-xs text-gray-600"
+                  >
+                    <span className="w-1 h-1 rounded-full bg-black" />
+                    {feature}
+                  </div>
+                ))}
+                {currentPlan !== "PREMIUM" && (
+                  <button
+                    className="w-full mt-2 bg-black text-white text-xs font-medium py-1.5 rounded-lg hover:bg-gray-800 transition-all"
+                    onClick={() => {
+                      alert(`Upgrade to ${currentPlanData.nextPlan} plan`);
+                    }}
+                  >
+                    Upgrade to {currentPlanData.nextPlan}
+                  </button>
+                )}
+                {currentPlan === "PREMIUM" && (
+                  <div className="mt-1 text-xs text-purple-600 font-medium flex items-center gap-1">
+                    <Crown className="w-3 h-3" />
+                    You're on the best plan!
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Navigation Items */}
       <nav className="flex-1 px-3 py-3 overflow-y-auto">
         <div className="space-y-1">
-          <NavItem
-            icon={LayoutDashboard}
-            label="Dashboard"
-            active
-            onClick={() => navigate("/dashboard")}
-          />
-          <NavItem
-            icon={Briefcase}
-            label="Tasks"
-            onClick={() => navigate("/tasks")}
-          />
-          <NavItem
-            icon={Users}
-            label="Employees"
-            onClick={() => navigate("/employees")}
-          />
-          <NavItem
-            icon={Target}
-            label="Campaigns"
-            onClick={() => navigate("/campaigns")}
-          />
-          <NavItem
-            icon={BarChart3}
-            label="Analytics"
-            onClick={() => navigate("/analytics")}
-          />
-          <NavItem
-            icon={Settings}
-            label="Settings"
-            onClick={() => navigate("/settings")}
-          />
+          {menuItems.map((item) => (
+            <NavItem
+              key={item.path}
+              icon={item.icon}
+              label={item.label}
+              active={location.pathname === item.path}
+              onClick={() => navigate(item.path)}
+              sidebarOpen={sidebarOpen}
+            />
+          ))}
         </div>
 
         <div className="mt-4 pt-4 border-t border-gray-200">
-          <NavItem icon={HelpCircle} label="Help & Support" />
+          <NavItem
+            icon={HelpCircle}
+            label="Help & Support"
+            sidebarOpen={sidebarOpen}
+            onClick={() => navigate("/help")}
+          />
           <NavItem
             icon={LogOut}
             label="Log Out"
             className="text-red-600 hover:bg-red-50"
+            sidebarOpen={sidebarOpen}
             onClick={handleLogout}
           />
         </div>
@@ -286,12 +359,14 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     active = false,
     className = "",
     onClick = () => {},
+    sidebarOpen = true,
   }: {
     icon: any;
     label: string;
     active?: boolean;
     className?: string;
     onClick?: () => void;
+    sidebarOpen?: boolean;
   }) => {
     if (!sidebarOpen && window.innerWidth >= 768) {
       return (
@@ -331,7 +406,7 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Desktop Sidebar */}
       <div
         className={`hidden md:block fixed left-0 top-0 h-full bg-white border-r border-gray-200 transition-all duration-300 z-20 ${
-          sidebarOpen ? "w-64" : "w-16"
+          sidebarOpen ? "w-64" : "w-20"
         }`}
       >
         <SidebarContent />
@@ -373,7 +448,9 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             >
               <Menu size={20} />
             </button>
-            <h1 className="text-black text-lg font-semibold">Dashboard</h1>
+            <h1 className="text-black text-lg font-semibold">
+              {menuItems.find((item) => item.path === location.pathname)?.label}
+            </h1>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
@@ -391,10 +468,10 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </span>
             </div>
             <span className="text-sm text-gray-600 hidden sm:block">
-              {user?.name || "User"}
+              {user?.name}
             </span>
             <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-white font-semibold text-sm">
-              {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
+              {user?.name?.charAt(0)?.toUpperCase()}
             </div>
           </div>
         </header>
