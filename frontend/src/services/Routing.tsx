@@ -7,6 +7,8 @@ import Home from "../pages/Home";
 import Login from "../pages/Login";
 import RegisterOrganization from "../pages/RegisterOrganization";
 import STATICPATHS from "../utils/STATICPATHS";
+import Members from "../pages/Members";
+import Settings from "../pages/Settings";
 
 // ============================================
 // ERROR BOUNDARY
@@ -100,6 +102,8 @@ const Routing = () => {
               }
             />
             <Route path={STATICPATHS.dashboard} element={<Dashboard />} />
+            <Route path={STATICPATHS.members} element={<Members />} />
+            <Route path={STATICPATHS.settings} element={<Settings />} />
             <Route
               path="employees"
               element={
@@ -130,17 +134,6 @@ const Routing = () => {
                     Analytics
                   </h2>
                   <p className="text-tertiary">View your analytics here.</p>
-                </div>
-              }
-            />
-            <Route
-              path="settings"
-              element={
-                <div className="card p-6">
-                  <h2 className="text-heading text-xl font-bold mb-4">
-                    Settings
-                  </h2>
-                  <p className="text-tertiary">Configure your settings here.</p>
                 </div>
               }
             />

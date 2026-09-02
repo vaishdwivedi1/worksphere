@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import STATICPATHS from "../utils/STATICPATHS";
 
 const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
@@ -87,60 +88,104 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const getRoleMenus = (role: string) => {
     const roleMenus: Record<string, any[]> = {
       owner: [
-        { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-        { icon: Building2, label: "Organization", path: "/organization" },
-        { icon: Users, label: "Members", path: "/members" },
-        { icon: UserCog, label: "Teams", path: "/teams" },
-        { icon: Users, label: "HR", path: "/hr" },
-        { icon: Gauge, label: "Sales", path: "/sales" },
-        { icon: Megaphone, label: "Marketing", path: "/marketing" },
-        { icon: Code, label: "Development", path: "/development" },
-        { icon: BarChart3, label: "Reports", path: "/reports" },
-        { icon: Settings, label: "Settings", path: "/settings" },
+        {
+          icon: LayoutDashboard,
+          label: "Dashboard",
+          path: STATICPATHS.dashboard,
+        },
+        {
+          icon: Building2,
+          label: "Organization",
+          path: STATICPATHS.organization,
+        },
+        { icon: Users, label: "Members", path: STATICPATHS.members },
+        { icon: UserCog, label: "Teams", path: STATICPATHS.teams },
+        { icon: Users, label: "HR", path: STATICPATHS.hr },
+        { icon: Gauge, label: "Sales", path: STATICPATHS.sales },
+        { icon: Megaphone, label: "Marketing", path: STATICPATHS.marketing },
+        { icon: Code, label: "Development", path: STATICPATHS.development },
+        { icon: BarChart3, label: "Reports", path: STATICPATHS.reports },
+        { icon: Settings, label: "Settings", path: STATICPATHS.settings },
       ],
       admin: [
-        { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-        { icon: Users, label: "Members", path: "/members" },
-        { icon: UserCog, label: "Teams", path: "/teams" },
-        { icon: Users, label: "HR", path: "/hr" },
-        { icon: Gauge, label: "Sales", path: "/sales" },
-        { icon: Megaphone, label: "Marketing", path: "/marketing" },
-        { icon: Code, label: "Development", path: "/development" },
-        { icon: BarChart3, label: "Reports", path: "/reports" },
+        {
+          icon: LayoutDashboard,
+          label: "Dashboard",
+          path: STATICPATHS.dashboard,
+        },
+        { icon: Users, label: "Members", path: STATICPATHS.members },
+        { icon: UserCog, label: "Teams", path: STATICPATHS.teams },
+        { icon: Users, label: "HR", path: STATICPATHS.hr },
+        { icon: Gauge, label: "Sales", path: STATICPATHS.sales },
+        { icon: Megaphone, label: "Marketing", path: STATICPATHS.marketing },
+        { icon: Code, label: "Development", path: STATICPATHS.development },
+        { icon: BarChart3, label: "Reports", path: STATICPATHS.reports },
       ],
       hr: [
-        { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-        { icon: Users, label: "Employees", path: "/employees" },
-        { icon: Calendar, label: "Leave", path: "/leave" },
-        { icon: Megaphone, label: "Announcements", path: "/announcements" },
-        { icon: Briefcase, label: "Jobs", path: "/jobs" },
-        { icon: BarChart3, label: "HR Reports", path: "/hr-reports" },
+        {
+          icon: LayoutDashboard,
+          label: "Dashboard",
+          path: STATICPATHS.dashboard,
+        },
+        { icon: Users, label: "Employees", path: STATICPATHS.employees },
+        { icon: Calendar, label: "Leave", path: STATICPATHS.leave },
+        {
+          icon: Megaphone,
+          label: "Announcements",
+          path: STATICPATHS.announcements,
+        },
+        { icon: Briefcase, label: "Jobs", path: STATICPATHS.jobs },
+        { icon: BarChart3, label: "HR Reports", path: STATICPATHS.hrReports },
       ],
       developer: [
-        { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-        { icon: FolderGit, label: "Projects", path: "/projects" },
-        { icon: GitBranch, label: "Sprints", path: "/sprints" },
-        { icon: ListTodo, label: "Tasks", path: "/tasks" },
-        { icon: CheckSquare, label: "TODO", path: "/todo" },
-        { icon: FileText, label: "Documents", path: "/documents" },
-        { icon: Rocket, label: "Releases", path: "/releases" },
+        {
+          icon: LayoutDashboard,
+          label: "Dashboard",
+          path: STATICPATHS.dashboard,
+        },
+        { icon: FolderGit, label: "Projects", path: STATICPATHS.projects },
+        { icon: GitBranch, label: "Sprints", path: STATICPATHS.sprints },
+        { icon: ListTodo, label: "Tasks", path: STATICPATHS.tasks },
+        { icon: CheckSquare, label: "TODO", path: STATICPATHS.todo },
+        { icon: FileText, label: "Documents", path: STATICPATHS.documents },
+        { icon: Rocket, label: "Releases", path: STATICPATHS.releases },
       ],
       sales: [
-        { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-        { icon: Gauge, label: "Leads", path: "/leads" },
-        { icon: UserCheck, label: "Assign/Reassign", path: "/assign-reassign" },
-        { icon: BarChart3, label: "Sales Analytics", path: "/sales-analytics" },
-        { icon: Award, label: "Performance", path: "/performance" },
+        {
+          icon: LayoutDashboard,
+          label: "Dashboard",
+          path: STATICPATHS.dashboard,
+        },
+        { icon: Gauge, label: "Leads", path: STATICPATHS.leads },
+        {
+          icon: UserCheck,
+          label: "Assign/Reassign",
+          path: STATICPATHS.assignReassign,
+        },
+        {
+          icon: BarChart3,
+          label: "Sales Analytics",
+          path: STATICPATHS.salesAnalytics,
+        },
+        { icon: Award, label: "Performance", path: STATICPATHS.performance },
       ],
       marketing: [
-        { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-        { icon: Megaphone, label: "Campaigns", path: "/campaigns" },
+        {
+          icon: LayoutDashboard,
+          label: "Dashboard",
+          path: STATICPATHS.dashboard,
+        },
+        { icon: Megaphone, label: "Campaigns", path: STATICPATHS.campaigns },
         {
           icon: BarChart3,
           label: "Campaign Analytics",
-          path: "/campaign-analytics",
+          path: STATICPATHS.campaignAnalytics,
         },
-        { icon: Layers, label: "Campaign Details", path: "/campaign-details" },
+        {
+          icon: Layers,
+          label: "Campaign Details",
+          path: STATICPATHS.campaignDetails,
+        },
       ],
     };
     return roleMenus[role] || roleMenus.owner;

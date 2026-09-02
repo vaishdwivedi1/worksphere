@@ -1,5 +1,14 @@
+// src/pages/Login.jsx
 import React, { useState } from "react";
-import { Eye, EyeOff, Mail, Lock, LogIn, Loader2 } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Mail,
+  Lock,
+  LogIn,
+  Loader2,
+  ArrowLeft,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../services/api";
 import APIPATHS from "../utils/APIPATHS";
@@ -10,10 +19,18 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSuccess, setForgotSuccess] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
     rememberMe: false,
+  });
+  const [forgotData, setForgotData] = useState({
+    email: "",
+    newPassword: "",
+    confirmPassword: "",
   });
 
   const handleInputChange = (e) => {
@@ -25,12 +42,20 @@ const Login = () => {
     setError("");
   };
 
+  const handleForgotChange = (e) => {
+    const { name, value } = e.target;
+    setForgotData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    setError("");
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    // Validate
     if (!formData.email.trim() || !formData.password.trim()) {
       setError("Please enter both email and password");
       setLoading(false);
@@ -44,12 +69,9 @@ const Login = () => {
       });
 
       if (response.success) {
-        // Store tokens and user data
         localStorage.setItem("authToken", response.data.token);
         localStorage.setItem("user", JSON.stringify(response.data.user));
         localStorage.setItem("org", JSON.stringify(response.data.organization));
-
-        // Redirect to dashboard
         navigate(STATICPATHS.dashboard);
       } else {
         setError(response.message || "Login failed");
@@ -61,6 +83,199 @@ const Login = () => {
     }
   };
 
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setForgotLoading(true);
+    setError("");
+    setForgotSuccess(false);
+
+    // Validate
+    if (!forgotData.email.trim()) {
+      setError("Please enter your email address");
+      setForgotLoading(false);
+      return;
+    }
+
+    if (!forgotData.newPassword.trim() || forgotData.newPassword.length < 6) {
+      setError("Password must be at least 6 characters long");
+      setForgotLoading(false);
+      return;
+    }
+
+    if (forgotData.newPassword !== forgotData.confirmPassword) {
+      setError("Passwords do not match");
+      setForgotLoading(false);
+      return;
+    }
+
+    try {
+      const response = await api.post(APIPATHS.forgotPassword, {
+        email: forgotData.email,
+        newpassword: forgotData.newPassword,
+      });
+
+      if (response.success) {
+        setForgotSuccess(true);
+        setForgotData({
+          email: "",
+          newPassword: "",
+          confirmPassword: "",
+        });
+        // Auto redirect to login after 3 seconds
+        setTimeout(() => {
+          setShowForgotPassword(false);
+          setForgotSuccess(false);
+        }, 3000);
+      } else {
+        setError(response.message || "Failed to reset password");
+      }
+    } catch (error) {
+      setError(error.message || "Something went wrong. Please try again.");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  // Login Form
+  if (showForgotPassword) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          {/* Logo/Brand */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 text-2xl font-bold text-black">
+              <span className="bg-black text-white p-2 rounded-lg">◆</span>
+              WorkSphere
+            </div>
+          </div>
+
+          {/* Forgot Password Card */}
+          <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-200">
+            <button
+              onClick={() => {
+                setShowForgotPassword(false);
+                setError("");
+                setForgotSuccess(false);
+              }}
+              className="flex items-center gap-2 text-sm text-gray-500 hover:text-black transition-colors mb-6"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Login
+            </button>
+
+            <div className="text-center mb-6">
+              <h2 className="text-xl font-bold text-black">Reset Password</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Enter your email and new password
+              </p>
+            </div>
+
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                {error}
+              </div>
+            )}
+
+            {forgotSuccess && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-600 text-sm">
+                Password reset successful! Redirecting to login...
+              </div>
+            )}
+
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="email"
+                    name="email"
+                    value={forgotData.email}
+                    onChange={handleForgotChange}
+                    placeholder="you@example.com"
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-black placeholder:text-gray-400 focus:outline-none focus:border-black focus:ring-2 focus:ring-black/10 transition-all"
+                    disabled={forgotSuccess}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  New Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="newPassword"
+                    value={forgotData.newPassword}
+                    onChange={handleForgotChange}
+                    placeholder="Enter new password"
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-black placeholder:text-gray-400 focus:outline-none focus:border-black focus:ring-2 focus:ring-black/10 transition-all"
+                    disabled={forgotSuccess}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="confirmPassword"
+                    value={forgotData.confirmPassword}
+                    onChange={handleForgotChange}
+                    placeholder="Confirm new password"
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-black placeholder:text-gray-400 focus:outline-none focus:border-black focus:ring-2 focus:ring-black/10 transition-all"
+                    disabled={forgotSuccess}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="showPassword"
+                  checked={showPassword}
+                  onChange={() => setShowPassword(!showPassword)}
+                  className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black"
+                />
+                <label htmlFor="showPassword" className="text-sm text-gray-600">
+                  Show passwords
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                disabled={forgotLoading || forgotSuccess}
+                className="w-full bg-black text-white font-semibold py-2.5 rounded-lg hover:bg-gray-800 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {forgotLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Resetting...
+                  </>
+                ) : (
+                  "Reset Password"
+                )}
+              </button>
+            </form>
+          </div>
+
+          <p className="text-center text-xs text-gray-400 mt-6">
+            © 2026 WorkSphere. All rights reserved.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Login Form (Original)
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -74,9 +289,8 @@ const Login = () => {
 
         {/* Login Card */}
         <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-200">
-          {/* Error Message */}
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm flex items-center gap-2">
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
               {error}
             </div>
           )}
@@ -108,6 +322,7 @@ const Login = () => {
                 </label>
                 <button
                   type="button"
+                  onClick={() => setShowForgotPassword(true)}
                   className="text-xs text-gray-400 hover:text-black transition-colors cursor-pointer"
                 >
                   Forgot password?
@@ -137,7 +352,7 @@ const Login = () => {
               </div>
             </div>
 
-            {/* Remember Me & Forgot Password */}
+            {/* Remember Me */}
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
                 <input
@@ -155,7 +370,7 @@ const Login = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-black text-white font-semibold py-2.5 rounded-lg hover:bg-gray-800 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+              className="w-full bg-black text-white font-semibold py-2.5 rounded-lg hover:bg-gray-800 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>

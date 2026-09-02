@@ -1,18 +1,15 @@
-import {
-  handleError,
-  handleSuccess,
-} from "../../commonFunctions/commonError.js";
+import { handleError, handleSuccess } from "../commonFunctions/commonError.js";
 import {
   generateEmailMobileOTP,
   validateEmailMobileOTP,
-} from "../../commonFunctions/otp.js";
+} from "../commonFunctions/otp.js";
 import {
   isValidEmail,
   isValidMobile,
   isValidPlan,
   isValidPassword,
-} from "../../commonFunctions/regex.js";
-import pool from "../../config/postgres.js";
+} from "../commonFunctions/regex.js";
+import pool from "../config/postgres.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 
@@ -184,7 +181,6 @@ export const createOrganization = async (req, res) => {
   }
 };
 
-// authControllers.js - Fixed
 export const verifyAndCreateOrganization = async (req, res) => {
   const {
     company_name,
@@ -443,10 +439,111 @@ export const loginUser = async (req, res) => {
 };
 
 // Other functions (keep as is)
-export const addMember = async (req, res) => {};
-export const generateMemberInvitationLink = async (req, res) => {};
-export const forgotPassword = async (req, res) => {};
-export const changePassword = async (req, res) => {};
+export const forgotPassword = async (req, res) => {
+  const { email, newpassword } = req.body;
+
+  // 1. Check required fields
+  if (!email || !newpassword) {
+    return handleError(res, 400, "Invalid data", null, "forgotPassword");
+  }
+
+  // 2. Validate email
+  if (!isValidEmail(email)) {
+    return handleError(
+      res,
+      400,
+      "Invalid email format",
+      null,
+      "forgotPassword",
+    );
+  }
+
+  // 3. Find user by email
+  const result = await pool.query(`SELECT * FROM users WHERE email = $1`, [
+    email,
+  ]);
+
+  // 4. Check user exists
+  const user = result.rows[0];
+
+  if (!user) {
+    return handleError(res, 400, "User not found", null, "forgotPassword");
+  }
+
+  const hashPassword = await bcrypt.hash(newpassword, 10);
+
+  const userResult = await pool.query(
+    `UPDATE users
+   SET password_hash = $1
+   WHERE email = $2`,
+    [hashPassword, email],
+  );
+  return res.status(200).json({
+    success: true,
+    statusCode: 200,
+    message: "User password changed",
+    data: {
+      user: userResult.rows[0],
+    },
+    timestamp: new Date().toISOString(),
+  });
+};
+export const changePassword = async (req, res) => {
+  const { email, prevpassword, newpassword } = req.body;
+
+  // 1. Check required fields
+  if (!email || !newpassword || !prevpassword) {
+    return handleError(res, 400, "Invalid data", null, "changePassword");
+  }
+
+  // 2. Validate email
+  if (!isValidEmail(email)) {
+    return handleError(
+      res,
+      400,
+      "Invalid email format",
+      null,
+      "changePassword",
+    );
+  }
+
+  // 3. Find user by email
+  const result = await pool.query(`SELECT * FROM users WHERE email = $1`, [
+    email,
+  ]);
+
+  // 4. Check user exists
+  const user = result.rows[0];
+
+  if (!user) {
+    return handleError(res, 400, "User not found", null, "changePassword");
+  }
+
+  // 5. Compare entered password with hashed password
+  const isPassCorrect = await bcrypt.compare(prevpassword, user.password_hash);
+
+  // 6. Check password
+  if (!isPassCorrect) {
+    return handleError(res, 400, "Invalid credentials", null, "changePassword");
+  }
+
+  const hashPassword = bcrypt.hash(newpassword, 10);
+
+  const userResult = await pool.query(
+    `UPDATE users
+   SET password_hash = $1
+   WHERE email = $2`,
+    [hashPassword, email],
+  );
+  return res.status(200).json({
+    success: true,
+    statusCode: 200,
+    message: "User password changed",
+    data: {
+      user: userResult,
+    },
+    timestamp: new Date().toISOString(),
+  });
+};
 export const logout = async (req, res) => {};
 export const refreshToken = async (req, res) => {};
-export const profile = async (req, res) => {};
