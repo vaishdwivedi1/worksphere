@@ -27,7 +27,7 @@ CREATE TABLE users (
     name VARCHAR(255) NOT NULL,
     
     -- Encrypted password (hash form mein store hota hai, plain text nahi)
-    password_hash VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255),
     
     -- Profile picture ka URL ya path (optional)
     profile_picture TEXT,

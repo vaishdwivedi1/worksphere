@@ -1,4 +1,5 @@
 import { handleError, handleSuccess } from "../commonFunctions/commonError.js";
+import { isValidEmail, isValidMobile } from "../commonFunctions/regex.js";
 import pool from "../config/postgres.js";
 
 export const getAllMember = async (req, res) => {
@@ -289,7 +290,85 @@ export const getAllMember = async (req, res) => {
     );
   }
 };
-export const addMember = async (req, res) => {};
+export const addMember = async (req, res) => {
+  const { orgId, memberEmail, memberPhone, memberRole, memberName, senderId } =
+    req.body;
+
+  if (!orgId || !memberEmail || !memberPhone || !memberName) {
+    return handleError(res, 400, "Invalid payload", null, "addMember");
+  }
+
+  const orgCheck = await pool.query(
+    "SELECT id FROM organizations WHERE id = $1",
+    [orgId],
+  );
+
+  if (orgCheck.rows.length === 0) {
+    return handleError(res, 404, "Organization not found", null, "addMember");
+  }
+
+  const isValidMemberEmail = isValidEmail(memberEmail);
+  const isValidMemberPhone = isValidMobile(memberPhone);
+  if (!isValidMemberEmail || !isValidMemberPhone) {
+    return handleError(res, 400, "Invalid email or phone", null, "addMember");
+  }
+
+  try {
+    // Check if user already exists in users table (by email or phone)
+    const isUserExist = await pool.query(
+      `SELECT id FROM users WHERE email = $1 OR phone = $2`,
+      [memberEmail, memberPhone],
+    );
+
+    //  If user exists ANYWHERE, instantly return error
+    if (isUserExist.rows.length > 0) {
+      return handleError(
+        res,
+        400,
+        "User already exists with this email or phone",
+        null,
+        "addMember",
+      );
+    }
+
+    // User doesn't exist - create new user
+    const userResult = await pool.query(
+      `INSERT INTO users (email, phone, name, is_active, password_hash , created_at, updated_at)
+       VALUES ($1, $2, $3, $4,$5 , NOW(), NOW()) 
+       RETURNING id`,
+      [memberEmail, memberPhone, memberName, true, memberPhone],
+    );
+
+    const userId = userResult.rows[0].id;
+
+    // Add user to organization_members
+    const orgMemRes = await pool.query(
+      `INSERT INTO organization_members (
+        organization_id,
+        user_id,
+        email,
+        role,
+        status,
+        invited_by,
+        created_at,
+        updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+      RETURNING *`,
+      [orgId, userId, memberEmail, memberRole, "active", senderId],
+    );
+
+    return handleSuccess(
+      res,
+      200,
+      "Member added successfully",
+      orgMemRes.rows[0],
+      "addMember",
+    );
+  } catch (error) {
+    console.error("Error in addMember:", error);
+    return handleError(res, 500, "Failed to add member", error, "addMember");
+  }
+};
 export const updateMember = async (req, res) => {};
 export const deleteMember = async (req, res) => {};
 export const generateMemberInvitationLink = async (req, res) => {};

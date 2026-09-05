@@ -21,6 +21,8 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { api } from "../services/api";
 import APIPATHS from "../utils/APIPATHS";
+import PhoneInput from "react-phone-number-input";
+import "react-phone-number-input/style.css";
 
 const Members = () => {
   const [members, setMembers] = useState([]);
@@ -29,7 +31,7 @@ const Members = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(""); // NEW: Debounced search
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -62,13 +64,17 @@ const Members = () => {
     role: "developer",
   });
 
+  // Phone state with country validation
+  const [phone, setPhone] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+
   // ============================================
-  // DEBOUNCE SEARCH TERM - NEW
+  // DEBOUNCE SEARCH TERM
   // ============================================
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
-    }, 500); // 500ms delay
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [searchTerm]);
@@ -106,14 +112,11 @@ const Members = () => {
     setError("");
 
     try {
-      // Build query parameters - ALL parameters sent as query params
       const params = new URLSearchParams();
 
-      // Always add these
       params.append("page", pageNum.toString());
       params.append("limit", "20");
 
-      // Add filters only if they have values (not empty) - USING DEBOUNCED SEARCH
       if (debouncedSearchTerm && debouncedSearchTerm.trim() !== "") {
         params.append("searchText", debouncedSearchTerm.trim());
       }
@@ -126,7 +129,6 @@ const Members = () => {
         params.append("status", filterStatus);
       }
 
-      // Make API call - orgId in URL path, all filters in query params
       const url = `${APIPATHS.getAllMember}/${orgId}?${params.toString()}`;
 
       console.log("Fetching members with URL:", url);
@@ -135,7 +137,6 @@ const Members = () => {
 
       console.log("Response from backend:", response);
 
-      // Check response structure from your backend
       if (response.success) {
         const newMembers = response.data.members || [];
         const pagination = response.pagination || {};
@@ -164,7 +165,7 @@ const Members = () => {
   };
 
   // ============================================
-  // INITIAL FETCH ON FILTER CHANGE - USING DEBOUNCED SEARCH
+  // INITIAL FETCH ON FILTER CHANGE
   // ============================================
   useEffect(() => {
     if (orgId) {
@@ -216,10 +217,25 @@ const Members = () => {
     setError("");
     setSuccess("");
 
+    // Validate phone if provided
+    if (phone && phone.length < 10) {
+      setError("Please enter a valid phone number");
+      setLoading(false);
+      return;
+    }
+
     try {
+      // Get sender ID from localStorage
+      const userData = JSON.parse(localStorage.getItem("user"));
+      const senderId = userData?.id;
+
       const payload = {
-        ...formData,
-        organizationId: orgId,
+        memberEmail: formData.email,
+        memberName: formData.name,
+        memberPhone: phone || "",
+        memberRole: formData.role,
+        orgId: orgId,
+        senderId: senderId || null, // Send sender ID
       };
 
       const response = await api.post(APIPATHS.addMember, payload);
@@ -233,6 +249,7 @@ const Members = () => {
           phone: "",
           role: "developer",
         });
+        setPhone("");
         setPage(1);
         setMembers([]);
         setHasMore(true);
@@ -257,17 +274,26 @@ const Members = () => {
     setError("");
     setSuccess("");
 
+    // Validate edit phone if provided
+    if (editPhone && editPhone.length < 10) {
+      setError("Please enter a valid phone number");
+      setLoading(false);
+      return;
+    }
+
     try {
       const memberId = selectedMember?.member_id || selectedMember?.id;
-      const response = await api.put(
-        `${APIPATHS.updateMember}/${memberId}`,
-        editFormData,
-      );
+      const response = await api.put(`${APIPATHS.updateMember}/${memberId}`, {
+        name: editFormData.name,
+        phone: editPhone || "",
+        role: editFormData.role,
+      });
 
       if (response.success) {
         setSuccess("Member updated successfully!");
         setShowEditModal(false);
         setSelectedMember(null);
+        setEditPhone("");
         setPage(1);
         setMembers([]);
         setHasMore(true);
@@ -409,6 +435,7 @@ const Members = () => {
       phone: member.phone || "",
       role: member.role || "developer",
     });
+    setEditPhone(member.phone || "");
     setShowEditModal(true);
   };
 
@@ -473,7 +500,6 @@ const Members = () => {
       {/* ============================================ */}
       <div className="mb-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          {/* Filters */}
           <div className="mt-4 flex flex-col sm:flex-row gap-4">
             {/* Search */}
             <div className="flex-1 relative">
@@ -651,7 +677,6 @@ const Members = () => {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2">
-                          {/* Status Toggle */}
                           <button
                             onClick={() =>
                               handleChangeStatus(
@@ -686,7 +711,6 @@ const Members = () => {
                             )}
                           </button>
 
-                          {/* Edit */}
                           <button
                             onClick={() => openEditModal(member)}
                             className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-all"
@@ -695,7 +719,6 @@ const Members = () => {
                             <Edit className="w-4 h-4" />
                           </button>
 
-                          {/* Delete */}
                           <button
                             onClick={() => openDeleteModal(member)}
                             className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 transition-all"
@@ -711,7 +734,6 @@ const Members = () => {
               </tbody>
             </table>
 
-            {/* Loading More Indicator */}
             {loadingMore && (
               <div className="flex items-center justify-center py-4 bg-gray-50">
                 <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
@@ -721,7 +743,6 @@ const Members = () => {
               </div>
             )}
 
-            {/* No More Results */}
             {!hasMore &&
               members.length > 0 &&
               members.length === totalCount && (
@@ -794,18 +815,14 @@ const Members = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Phone
                 </label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) =>
-                      setFormData({ ...formData, phone: e.target.value })
-                    }
-                    placeholder="+91 9876543210"
-                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-black placeholder:text-gray-400 focus:outline-none focus:border-black focus:ring-2 focus:ring-black/10 transition-all"
-                  />
-                </div>
+                <PhoneInput
+                  international
+                  defaultCountry="IN"
+                  placeholder="Enter phone number"
+                  value={phone}
+                  onChange={setPhone}
+                  className="bg-gray-50 border border-gray-200 rounded-lg px-3.5 text-black text-sm outline-none focus:border-black focus:ring-2 focus:ring-black/10 transition-all"
+                />
               </div>
 
               <div>
@@ -895,21 +912,14 @@ const Members = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Phone
                 </label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="tel"
-                    value={editFormData.phone}
-                    onChange={(e) =>
-                      setEditFormData({
-                        ...editFormData,
-                        phone: e.target.value,
-                      })
-                    }
-                    placeholder="+91 9876543210"
-                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-black placeholder:text-gray-400 focus:outline-none focus:border-black focus:ring-2 focus:ring-black/10 transition-all"
-                  />
-                </div>
+                <PhoneInput
+                  international
+                  defaultCountry="IN"
+                  placeholder="Enter phone number"
+                  value={editPhone}
+                  onChange={setEditPhone}
+                  className="bg-gray-50 border border-gray-200 rounded-lg px-3.5 text-black text-sm outline-none focus:border-black focus:ring-2 focus:ring-black/10 transition-all"
+                />
               </div>
 
               <div>
