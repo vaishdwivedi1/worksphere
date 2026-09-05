@@ -1,4 +1,3 @@
-// commonFunctions/commonError.js
 export const handleSuccess = (res, statusCode, message, data, functionName) => {
   console.log(` Success in ${functionName}:`, message);
 
