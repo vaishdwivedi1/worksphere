@@ -2,6 +2,7 @@ const STATICPATHS = {
   // Auth & Public
   registerOrganization: "/register-organization",
   login: "/login",
+  acceptInvitation:"/accept-invitation",
 
   // Core
   dashboard: "/dashboard",

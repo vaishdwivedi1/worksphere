@@ -9,6 +9,7 @@ import RegisterOrganization from "../pages/RegisterOrganization";
 import STATICPATHS from "../utils/STATICPATHS";
 import Members from "../pages/Members";
 import Settings from "../pages/Settings";
+import AcceptInvitation from "../pages/AcceptInvitation";
 
 // ============================================
 // ERROR BOUNDARY
@@ -82,6 +83,10 @@ const Routing = () => {
             element={<RegisterOrganization />}
           />
           <Route path={STATICPATHS.login} element={<Login />} />
+          <Route
+            path={STATICPATHS.acceptInvitation}
+            element={<AcceptInvitation />}
+          />
 
           {/* Protected Routes (With Sidebar) */}
           <Route

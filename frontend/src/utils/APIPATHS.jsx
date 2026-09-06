@@ -6,6 +6,8 @@ const APIPATHS = {
   forgotPassword: "/worksphere/api/v1/auth/forgot-password",
   changePassword: "/worksphere/api/v1/auth/change-password",
   logout: "/worksphere/api/v1/auth/logout",
+  verifyMemberInvitationLink:
+    "/worksphere/api/v1/organization/member/verify-invitation-link",
 
   // member
   getAllMember: "/worksphere/api/v1/organization/members",

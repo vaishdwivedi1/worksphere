@@ -333,10 +333,9 @@ export const verifyAndCreateOrganization = async (req, res) => {
         role,
         status,
         invited_by,
-        joined_at,
         created_at,
         updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), NOW())`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, NOW(),  NOW())`,
       [organizationId, userId, owner_email, "owner", "active", userId],
     );
 

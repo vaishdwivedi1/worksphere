@@ -375,7 +375,6 @@ export const addMember = async (req, res) => {
 export const generateMemberInvitationLink = async (req, res) => {
   const { orgId, memberEmail, memberPhone } = req.body;
 
-  // Validate required fields
   if (!orgId || !memberEmail) {
     return handleError(
       res,
@@ -386,7 +385,7 @@ export const generateMemberInvitationLink = async (req, res) => {
     );
   }
 
-  // Check if organization exists
+  // Check organization exists
   const orgCheck = await pool.query(
     "SELECT id FROM organizations WHERE id = $1",
     [orgId],
@@ -402,7 +401,7 @@ export const generateMemberInvitationLink = async (req, res) => {
     );
   }
 
-  // Validate email and phone format
+  // Validate email and phone
   const isValidMemberEmail = isValidEmail(memberEmail);
   const isValidMemberPhone = isValidMobile(memberPhone);
 
@@ -417,13 +416,12 @@ export const generateMemberInvitationLink = async (req, res) => {
   }
 
   try {
-    // Check if user exists in users table (by email or phone)
+    // Check if user exists
     const userExists = await pool.query(
       `SELECT id FROM users WHERE email = $1 OR phone = $2`,
       [memberEmail, memberPhone],
     );
 
-    // If user does NOT exist, return error
     if (userExists.rows.length === 0) {
       return handleError(
         res,
@@ -436,41 +434,57 @@ export const generateMemberInvitationLink = async (req, res) => {
 
     const userId = userExists.rows[0].id;
 
-    // Check if user is already a member of this organization
+    // Check if user is already a member
     const userInOrg = await pool.query(
       `SELECT * FROM organization_members WHERE organization_id = $1 AND user_id = $2`,
       [orgId, userId],
     );
 
-    if (userInOrg.rows.length == 0) {
+    if (userInOrg.rows.length === 0) {
       return handleError(
         res,
         400,
-        "User does not exist with this email or phone. Please ask the user to register first.",
-        null,
-        "generateMemberInvitationLink",
-      );
-    }
-    if (userInOrg.rows[0].status == "active") {
-      return handleError(
-        res,
-        400,
-        "User already registered.",
+        "User is not a member of this organization",
         null,
         "generateMemberInvitationLink",
       );
     }
 
-    // Generate invitation link
+    if (userInOrg.rows[0].status === "active") {
+      return handleError(
+        res,
+        400,
+        "User is already an active member",
+        null,
+        "generateMemberInvitationLink",
+      );
+    }
+
+    //  Generate invitation token
     const invitationToken = generateInvitationToken();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
+
+    //  SAVE TOKEN TO DATABASE (THIS WAS MISSING!)
+    await pool.query(
+      `UPDATE organization_members 
+       SET invitation_token = $1,
+           invitation_status = 'pending',
+           invitation_expires_at = $2,
+           invitation_sent_at = NOW(),
+           updated_at = NOW()
+       WHERE organization_id = $3 AND email = $4`,
+      [invitationToken, expiresAt, orgId, memberEmail],
+    );
+
+    // Create link with token
     const link = `${process.env.FRONTENDURL}/accept-invitation?token=${invitationToken}&orgId=${orgId}&email=${memberEmail}`;
 
-    // Send email invitation
+    // Send email
     await sendEmailMessage(memberEmail, link);
 
     console.log({ link });
 
-    // Return success response
     return handleSuccess(
       res,
       200,
@@ -478,7 +492,7 @@ export const generateMemberInvitationLink = async (req, res) => {
       {
         email: memberEmail,
         orgId: orgId,
-        link: link, // Be careful about exposing this in production
+        link: link,
       },
       "generateMemberInvitationLink",
     );
@@ -499,8 +513,173 @@ const generateInvitationToken = () => {
   return crypto.randomBytes(32).toString("hex");
 };
 
-export const verifyMemberInvitationLink = async (req, res) => {};
+export const verifyMemberInvitationLink = async (req, res) => {
+  const { token, orgId, email } = req.query;
 
+  if (!token || !orgId || !email) {
+    return handleError(
+      res,
+      400,
+      "Missing required parameters: token, orgId, or email",
+      null,
+      "verifyMemberInvitationLink",
+    );
+  }
+
+  try {
+    // Check organization exists
+    const orgCheck = await pool.query(
+      `SELECT id FROM organizations WHERE id = $1`,
+      [orgId],
+    );
+
+    if (orgCheck.rows.length === 0) {
+      return handleError(
+        res,
+        404,
+        "Organization not found",
+        null,
+        "verifyMemberInvitationLink",
+      );
+    }
+
+    // Check invitation
+    const memberCheck = await pool.query(
+      `SELECT * FROM organization_members 
+       WHERE organization_id = $1
+       AND email = $2
+       AND invitation_token = $3
+       AND invitation_status = 'pending'`,
+      [orgId, email, token],
+    );
+
+    if (memberCheck.rows.length === 0) {
+      return handleError(
+        res,
+        400,
+        "Invalid or expired invitation link",
+        null,
+        "verifyMemberInvitationLink",
+      );
+    }
+
+    const member = memberCheck.rows[0];
+
+    // Check expiration
+    if (
+      member.invitation_expires_at &&
+      new Date() > new Date(member.invitation_expires_at)
+    ) {
+      return handleError(
+        res,
+        400,
+        "Invitation link has expired. Please request a new invitation.",
+        null,
+        "verifyMemberInvitationLink",
+      );
+    }
+
+    // Check if user exists
+    const userExists = await pool.query(
+      "SELECT id FROM users WHERE email = $1",
+      [email],
+    );
+
+    if (userExists.rows.length === 0) {
+      return handleError(
+        res,
+        404,
+        "User account not found. Please register first.",
+        null,
+        "verifyMemberInvitationLink",
+      );
+    }
+
+    const userId = userExists.rows[0].id;
+
+    // Check if already active
+    const activeMemberCheck = await pool.query(
+      `SELECT * FROM organization_members
+       WHERE organization_id = $1
+       AND user_id = $2
+       AND status = 'active'`,
+      [orgId, userId],
+    );
+
+    if (activeMemberCheck.rows.length > 0) {
+      return handleError(
+        res,
+        400,
+        "User is already an active member of this organization",
+        null,
+        "verifyMemberInvitationLink",
+      );
+    }
+
+    // Update member with correct values
+    await pool.query(
+      `UPDATE organization_members 
+       SET status = 'active', 
+           invitation_status = 'accepted',
+           invitation_accepted_at = NOW(),
+           updated_at = NOW(),
+           user_id = $1
+       WHERE id = $2`,
+      [userId, member.id],
+    );
+
+    // Update user active status
+    await pool.query(
+      `UPDATE users 
+       SET is_active = TRUE,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [userId],
+    );
+
+    // ✅ FIXED: Remove all // comments from SQL query
+    const updatedMember = await pool.query(
+      `SELECT 
+        u.id AS user_id,
+        u.name,
+        u.email AS user_email,
+        u.phone,
+        u.profile_picture,
+        u.is_active AS user_active,
+        om.id AS member_id,
+        om.email AS member_email,
+        om.role,
+        om.status AS member_status,
+        om.department,
+        om.created_at AS joined_at,
+        om.updated_at AS member_updated_at
+      FROM users u
+      INNER JOIN organization_members om ON u.id = om.user_id
+      WHERE om.id = $1`,
+      [member.id],
+    );
+
+    return handleSuccess(
+      res,
+      200,
+      "Invitation verified and membership activated successfully",
+      {
+        member: updatedMember.rows[0],
+        organizationId: orgId,
+      },
+      "verifyMemberInvitationLink",
+    );
+  } catch (error) {
+    console.error("Error in verifyMemberInvitationLink:", error);
+    return handleError(
+      res,
+      500,
+      "Failed to verify invitation link",
+      error,
+      "verifyMemberInvitationLink",
+    );
+  }
+};
 export const updateMember = async (req, res) => {};
 export const deleteMember = async (req, res) => {};
 export const changeStatusOfMember = async (req, res) => {};

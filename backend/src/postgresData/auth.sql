@@ -111,7 +111,8 @@ CREATE TABLE organization_members (
     
     -- Member ka email (organization ke andar unique hona chahiye)
     email VARCHAR(255) NOT NULL,
-    
+    name VARCHAR(255),
+
     -- Role: owner, admin, hr, developer, sales, marketing (default: developer)
     role VARCHAR(50) NOT NULL DEFAULT 'developer',
     
@@ -124,7 +125,13 @@ CREATE TABLE organization_members (
     -- Kaunsi user ne invite kiya? (agar kisi ne invite kiya ho)
     invited_by UUID REFERENCES users(id) ON DELETE SET NULL,
     
-    -- Timestamps for tracking
+    -- Invitation Columns
+    invitation_token VARCHAR(255) UNIQUE,
+    invitation_expires_at TIMESTAMP,
+    invitation_sent_at TIMESTAMP,
+    invitation_accepted_at TIMESTAMP,
+    invitation_status VARCHAR(50) DEFAULT 'pending',
+    
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
@@ -182,7 +189,7 @@ CREATE INDEX idx_users_phone_trgm ON users USING gin (phone gin_trgm_ops);
 -- Index for searching members by role
 -- Example: "SELECT * FROM organization_members WHERE role % 'devloper'"
 CREATE INDEX idx_om_role_trgm ON organization_members USING gin (role gin_trgm_ops);
-
+CREATE INDEX idx_om_name_trgm ON organization_members USING gin (name gin_trgm_ops);
 
 -- ============================================
 -- STEP 3: B-tree Indexes for Exact Matches and Sorting
@@ -220,6 +227,13 @@ CREATE INDEX idx_om_created_at ON organization_members (created_at DESC);
 -- ============================================
 
 -- Organization + Status combo (common: "show all active members of this org")
+
+-- Invitation Indexes
+CREATE INDEX idx_om_invitation_token ON organization_members (invitation_token);
+CREATE INDEX idx_om_invitation_status ON organization_members (invitation_status);
+CREATE INDEX idx_om_invitation_expires ON organization_members (invitation_expires_at);
+
+-- Composite Indexes
 CREATE INDEX idx_om_org_status ON organization_members (organization_id, status);
 
 -- Organization + Role combo (common: "show all admin members of this org")
@@ -227,7 +241,7 @@ CREATE INDEX idx_om_org_role ON organization_members (organization_id, role);
 
 -- Organization + Created_at combo (common: "show newest members of this org")
 CREATE INDEX idx_om_org_created ON organization_members (organization_id, created_at DESC);
-
+CREATE INDEX idx_om_org_invitation ON organization_members (organization_id, invitation_status);
 
 -- ============================================
 -- STEP 5: Partial Indexes for Most Common Filters
