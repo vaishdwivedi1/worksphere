@@ -840,5 +840,137 @@ export const changeStatusOfMember = async (req, res) => {
     );
   }
 };
-export const deleteMember = async (req, res) => {};
+export const deleteMember = async (req, res) => {
+  const { userId, orgId } = req.query;
+
+  // Validate required parameters
+  if (!orgId || !userId) {
+    return handleError(
+      res,
+      400,
+      "Missing required parameters: orgId, userId",
+      null,
+      "deleteMember",
+    );
+  }
+
+  try {
+    // Check organization exists
+    const orgCheck = await pool.query(
+      `SELECT id FROM organizations WHERE id = $1`,
+      [orgId],
+    );
+
+    if (orgCheck.rows.length === 0) {
+      return handleError(
+        res,
+        404,
+        "Organization not found",
+        null,
+        "deleteMember",
+      );
+    }
+
+    // Check if member exists in this organization
+    const memberCheck = await pool.query(
+      `SELECT * FROM organization_members 
+       WHERE organization_id = $1
+       AND user_id = $2`,
+      [orgId, userId],
+    );
+
+    if (memberCheck.rows.length === 0) {
+      return handleError(
+        res,
+        404,
+        "Member not found in this organization",
+        null,
+        "deleteMember",
+      );
+    }
+
+    const member = memberCheck.rows[0];
+
+    // Check if user exists
+    const userExists = await pool.query(
+      "SELECT id, role FROM users WHERE id = $1",
+      [userId],
+    );
+
+    if (userExists.rows.length === 0) {
+      return handleError(
+        res,
+        404,
+        "User account not found",
+        null,
+        "deleteMember",
+      );
+    }
+
+    // ✅ Prevent deleting the organization owner
+    if (member.role === "owner") {
+      return handleError(
+        res,
+        403,
+        "Cannot delete the organization owner. Transfer ownership first.",
+        null,
+        "deleteMember",
+      );
+    }
+
+    try {
+      await pool.query("BEGIN");
+
+      //  Delete from organization_members first (foreign key constraint)
+      await pool.query(
+        `DELETE FROM organization_members WHERE user_id = $1 AND organization_id = $2`,
+        [userId, orgId],
+      );
+
+      //  Check if user is a member of any other organization
+      const otherOrgsCheck = await pool.query(
+        `SELECT COUNT(*) FROM organization_members WHERE user_id = $1`,
+        [userId],
+      );
+
+      const isMemberOfOtherOrg = parseInt(otherOrgsCheck.rows[0].count) > 0;
+
+      //  Only delete from users table if user is not a member of any other organization
+      if (!isMemberOfOtherOrg) {
+        await pool.query(`DELETE FROM users WHERE id = $1`, [userId]);
+      }
+
+      await pool.query("COMMIT");
+
+      return handleSuccess(
+        res,
+        200,
+        isMemberOfOtherOrg
+          ? "Member removed from organization successfully. User still exists in other organizations."
+          : "Member and user account deleted successfully",
+        {
+          userId: userId,
+          orgId: orgId,
+          userDeleted: !isMemberOfOtherOrg,
+          removedFromOrg: true,
+        },
+        "deleteMember",
+      );
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("Error in deleteMember:", error);
+    return handleError(
+      res,
+      500,
+      "Failed to delete member",
+      error,
+      "deleteMember",
+    );
+  }
+};
 export const updateMember = async (req, res) => {};

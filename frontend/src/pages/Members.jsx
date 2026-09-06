@@ -442,8 +442,11 @@ const Members = () => {
     setSuccess("");
 
     try {
-      const memberId = selectedMember?.member_id || selectedMember?.id;
-      const response = await api.delete(`${APIPATHS.deleteMember}/${memberId}`);
+      const userId = selectedMember?.user_id || selectedMember?.id;
+
+      const response = await api.delete(
+        `${APIPATHS.deleteMember}?userId=${userId}&orgId=${orgId}`,
+      );
 
       if (response.success) {
         setSuccess("Member deleted successfully!");
@@ -1105,13 +1108,18 @@ const Members = () => {
               <h2 className="text-xl font-bold text-black mb-2">
                 Delete Member
               </h2>
-              <p className="text-gray-500 text-sm mb-6">
+              <p className="text-gray-500 text-sm mb-4">
                 Are you sure you want to delete{" "}
                 <span className="font-semibold text-black">
                   {selectedMember.name}
                 </span>
-                ? This action cannot be undone.
+                ?
               </p>
+              <p className="text-xs text-red-500 mb-6">
+                ⚠️ This action cannot be undone. This will permanently delete
+                the user account and remove them from the organization.
+              </p>
+
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowDeleteModal(false)}
@@ -1127,7 +1135,7 @@ const Members = () => {
                   {loading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
-                    "Delete"
+                    "Delete Permanently"
                   )}
                 </button>
               </div>
