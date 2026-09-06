@@ -1,6 +1,8 @@
 import { handleError, handleSuccess } from "../commonFunctions/commonError.js";
+import { sendEmailMessage } from "../commonFunctions/otp.js";
 import { isValidEmail, isValidMobile } from "../commonFunctions/regex.js";
 import pool from "../config/postgres.js";
+import crypto from "crypto";
 
 export const getAllMember = async (req, res) => {
   // ============================================
@@ -336,7 +338,7 @@ export const addMember = async (req, res) => {
       `INSERT INTO users (email, phone, name, is_active, password_hash , created_at, updated_at)
        VALUES ($1, $2, $3, $4,$5 , NOW(), NOW()) 
        RETURNING id`,
-      [memberEmail, memberPhone, memberName, true, memberPhone],
+      [memberEmail, memberPhone, memberName, false, memberPhone],
     );
 
     const userId = userResult.rows[0].id;
@@ -354,7 +356,7 @@ export const addMember = async (req, res) => {
         updated_at
       ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
       RETURNING *`,
-      [orgId, userId, memberEmail, memberRole, "active", senderId],
+      [orgId, userId, memberEmail, memberRole, "pending", senderId],
     );
 
     return handleSuccess(
@@ -369,7 +371,136 @@ export const addMember = async (req, res) => {
     return handleError(res, 500, "Failed to add member", error, "addMember");
   }
 };
+
+export const generateMemberInvitationLink = async (req, res) => {
+  const { orgId, memberEmail, memberPhone } = req.body;
+
+  // Validate required fields
+  if (!orgId || !memberEmail) {
+    return handleError(
+      res,
+      400,
+      "Invalid payload",
+      null,
+      "generateMemberInvitationLink",
+    );
+  }
+
+  // Check if organization exists
+  const orgCheck = await pool.query(
+    "SELECT id FROM organizations WHERE id = $1",
+    [orgId],
+  );
+
+  if (orgCheck.rows.length === 0) {
+    return handleError(
+      res,
+      404,
+      "Organization not found",
+      null,
+      "generateMemberInvitationLink",
+    );
+  }
+
+  // Validate email and phone format
+  const isValidMemberEmail = isValidEmail(memberEmail);
+  const isValidMemberPhone = isValidMobile(memberPhone);
+
+  if (!isValidMemberEmail || !isValidMemberPhone) {
+    return handleError(
+      res,
+      400,
+      "Invalid email or phone",
+      null,
+      "generateMemberInvitationLink",
+    );
+  }
+
+  try {
+    // Check if user exists in users table (by email or phone)
+    const userExists = await pool.query(
+      `SELECT id FROM users WHERE email = $1 OR phone = $2`,
+      [memberEmail, memberPhone],
+    );
+
+    // If user does NOT exist, return error
+    if (userExists.rows.length === 0) {
+      return handleError(
+        res,
+        404,
+        "User does not exist with this email or phone. Please ask the user to register first.",
+        null,
+        "generateMemberInvitationLink",
+      );
+    }
+
+    const userId = userExists.rows[0].id;
+
+    // Check if user is already a member of this organization
+    const userInOrg = await pool.query(
+      `SELECT * FROM organization_members WHERE organization_id = $1 AND user_id = $2`,
+      [orgId, userId],
+    );
+
+    if (userInOrg.rows.length == 0) {
+      return handleError(
+        res,
+        400,
+        "User does not exist with this email or phone. Please ask the user to register first.",
+        null,
+        "generateMemberInvitationLink",
+      );
+    }
+    if (userInOrg.rows[0].status == "active") {
+      return handleError(
+        res,
+        400,
+        "User already registered.",
+        null,
+        "generateMemberInvitationLink",
+      );
+    }
+
+    // Generate invitation link
+    const invitationToken = generateInvitationToken();
+    const link = `${process.env.FRONTENDURL}/accept-invitation?token=${invitationToken}&orgId=${orgId}&email=${memberEmail}`;
+
+    // Send email invitation
+    await sendEmailMessage(memberEmail, link);
+
+    console.log({ link });
+
+    // Return success response
+    return handleSuccess(
+      res,
+      200,
+      "Invitation link sent successfully",
+      {
+        email: memberEmail,
+        orgId: orgId,
+        link: link, // Be careful about exposing this in production
+      },
+      "generateMemberInvitationLink",
+    );
+  } catch (error) {
+    console.error("Error in generateMemberInvitationLink:", error);
+    return handleError(
+      res,
+      500,
+      "Failed to generate invitation link",
+      error,
+      "generateMemberInvitationLink",
+    );
+  }
+};
+
+// Helper function to generate invitation token
+const generateInvitationToken = () => {
+  return crypto.randomBytes(32).toString("hex");
+};
+
+export const verifyMemberInvitationLink = async (req, res) => {};
+
 export const updateMember = async (req, res) => {};
 export const deleteMember = async (req, res) => {};
-export const generateMemberInvitationLink = async (req, res) => {};
 export const changeStatusOfMember = async (req, res) => {};

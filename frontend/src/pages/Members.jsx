@@ -38,10 +38,13 @@ const Members = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showAddSuccessModal, setShowAddSuccessModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [newMemberData, setNewMemberData] = useState(null);
   const [invitationLink, setInvitationLink] = useState("");
   const [copySuccess, setCopySuccess] = useState(false);
   const [orgId, setOrgId] = useState(null);
+  const [inviteModalData, setInviteModalData] = useState(null);
 
   // Pagination states
   const [page, setPage] = useState(1);
@@ -235,7 +238,7 @@ const Members = () => {
         memberPhone: phone || "",
         memberRole: formData.role,
         orgId: orgId,
-        senderId: senderId || null, // Send sender ID
+        senderId: senderId || null,
       };
 
       const response = await api.post(APIPATHS.addMember, payload);
@@ -243,6 +246,20 @@ const Members = () => {
       if (response.success) {
         setSuccess("Member added successfully!");
         setShowAddModal(false);
+
+        // Store new member data for invitation
+        setNewMemberData({
+          name: formData.name,
+          email: formData.email,
+          role: formData.role,
+          phone: formData.phone,
+          memberId: response.data?.member?.id || response.data?.id,
+        });
+
+        // Show success modal with invitation option
+        setShowAddSuccessModal(true);
+
+        // Reset form
         setFormData({
           email: "",
           name: "",
@@ -262,6 +279,111 @@ const Members = () => {
       setError(err.message || "Something went wrong");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ============================================
+  // GENERATE INVITATION FOR NEW MEMBER
+  // ============================================
+  const handleGenerateInviteForNewMember = async () => {
+    setLoading(true);
+    setError("");
+    setInvitationLink("");
+    setCopySuccess(false);
+
+    try {
+      const payload = {
+        orgId: orgId,
+        memberEmail: newMemberData?.email,
+        memberPhone: newMemberData?.phone || "",
+        memberRole: newMemberData?.role || "developer",
+        memberName: newMemberData?.name,
+        senderId: JSON.parse(localStorage.getItem("user"))?.id || null,
+      };
+
+      const response = await api.post(
+        APIPATHS.generateMemberInvitationLink,
+        payload,
+      );
+
+      if (response.success) {
+        setInvitationLink(response.data.link || response.data.data?.link);
+        setInviteModalData({
+          email: newMemberData?.email,
+          name: newMemberData?.name,
+          isUserActive: response.data.data?.isUserActive || false,
+          needsRegistration: response.data.data?.needsRegistration || false,
+        });
+        setShowAddSuccessModal(false);
+        setShowInviteModal(true);
+      } else {
+        setError(response.message || "Failed to generate invitation link");
+      }
+    } catch (err) {
+      console.error("Error generating invite:", err);
+      setError(err.message || "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ============================================
+  // GENERATE INVITATION FOR EXISTING MEMBER
+  // ============================================
+  const handleGenerateInvite = async (member = null) => {
+    setLoading(true);
+    setError("");
+    setInvitationLink("");
+    setCopySuccess(false);
+
+    try {
+      const targetMember = member || selectedMember;
+
+      const payload = {
+        orgId: orgId,
+        memberEmail: targetMember?.member_email || targetMember?.email,
+        memberPhone: targetMember?.phone || "",
+        memberRole: targetMember?.role || "developer",
+        memberName: targetMember?.name,
+        senderId: JSON.parse(localStorage.getItem("user"))?.id || null,
+      };
+
+      const response = await api.post(
+        APIPATHS.generateMemberInvitationLink,
+        payload,
+      );
+
+      if (response.success) {
+        setInvitationLink(response.data.link || response.data.data?.link);
+        setInviteModalData({
+          email: targetMember?.member_email || targetMember?.email,
+          name: targetMember?.name,
+          isUserActive: response.data.data?.isUserActive || false,
+          needsRegistration: response.data.data?.needsRegistration || false,
+          status: targetMember?.member_status || targetMember?.status,
+        });
+        setShowInviteModal(true);
+      } else {
+        setError(response.message || "Failed to generate invitation link");
+      }
+    } catch (err) {
+      console.error("Error generating invite:", err);
+      setError(err.message || "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ============================================
+  // COPY TO CLIPBOARD
+  // ============================================
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(invitationLink);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 3000);
+    } catch (err) {
+      setError("Failed to copy link");
     }
   };
 
@@ -385,47 +507,6 @@ const Members = () => {
   };
 
   // ============================================
-  // GENERATE INVITATION LINK
-  // ============================================
-  const handleGenerateInvite = async () => {
-    setLoading(true);
-    setError("");
-    setInvitationLink("");
-    setCopySuccess(false);
-
-    try {
-      const response = await api.post(APIPATHS.generateMemberInvitationLink, {
-        organizationId: orgId,
-      });
-
-      if (response.success) {
-        setInvitationLink(response.data.invitationLink || response.data.link);
-        setShowInviteModal(true);
-      } else {
-        setError(response.message || "Failed to generate invitation link");
-      }
-    } catch (err) {
-      console.error("Error generating invite:", err);
-      setError(err.message || "Something went wrong");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ============================================
-  // COPY TO CLIPBOARD
-  // ============================================
-  const copyToClipboard = async () => {
-    try {
-      await navigator.clipboard.writeText(invitationLink);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 3000);
-    } catch (err) {
-      setError("Failed to copy link");
-    }
-  };
-
-  // ============================================
   // OPEN EDIT MODAL
   // ============================================
   const openEditModal = (member) => {
@@ -445,6 +526,14 @@ const Members = () => {
   const openDeleteModal = (member) => {
     setSelectedMember(member);
     setShowDeleteModal(true);
+  };
+
+  // ============================================
+  // OPEN INVITE MODAL FOR EXISTING MEMBER
+  // ============================================
+  const openInviteModal = (member) => {
+    setSelectedMember(member);
+    handleGenerateInvite(member);
   };
 
   // ============================================
@@ -544,7 +633,7 @@ const Members = () => {
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             <button
-              onClick={handleGenerateInvite}
+              onClick={() => handleGenerateInvite()}
               className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-medium"
             >
               <Link className="w-4 h-4" />
@@ -623,6 +712,7 @@ const Members = () => {
                 {members.map((member, index) => {
                   const isLastItem = index === members.length - 1;
                   const memberId = member.member_id || member.id;
+                  const status = member.member_status || member.status;
 
                   return (
                     <tr
@@ -663,13 +753,10 @@ const Members = () => {
                       <td className="px-6 py-4">
                         <span
                           className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusBadge(
-                            member.member_status || member.status,
+                            status,
                           )}`}
                         >
-                          {(member.member_status || member.status)
-                            ?.charAt(0)
-                            .toUpperCase() +
-                            (member.member_status || member.status)?.slice(1)}
+                          {status?.charAt(0).toUpperCase() + status?.slice(1)}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500">
@@ -677,34 +764,33 @@ const Members = () => {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2">
+                          {/* Invite Button - Show for inactive users or users who haven't joined */}
+                          {(status === "inactive" || status === "pending") && (
+                            <button
+                              onClick={() => openInviteModal(member)}
+                              className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-all"
+                              title="Send Invitation Link"
+                            >
+                              <Link className="w-4 h-4" />
+                            </button>
+                          )}
+
                           <button
-                            onClick={() =>
-                              handleChangeStatus(
-                                memberId,
-                                member.member_status || member.status,
-                              )
-                            }
+                            onClick={() => handleChangeStatus(memberId, status)}
                             className={`p-1.5 rounded-lg transition-all ${
-                              (member.member_status || member.status) ===
-                              "active"
+                              status === "active"
                                 ? "text-green-600 hover:bg-green-50"
-                                : (member.member_status || member.status) ===
-                                    "pending"
+                                : status === "pending"
                                   ? "text-yellow-600 hover:bg-yellow-50"
                                   : "text-red-600 hover:bg-red-50"
                             }`}
                             title={
-                              (member.member_status || member.status) ===
-                              "active"
-                                ? "Deactivate"
-                                : "Activate"
+                              status === "active" ? "Deactivate" : "Activate"
                             }
                           >
-                            {(member.member_status || member.status) ===
-                            "active" ? (
+                            {status === "active" ? (
                               <UserCheck className="w-4 h-4" />
-                            ) : (member.member_status || member.status) ===
-                              "pending" ? (
+                            ) : status === "pending" ? (
                               <UserPlus className="w-4 h-4" />
                             ) : (
                               <UserX className="w-4 h-4" />
@@ -873,6 +959,55 @@ const Members = () => {
       )}
 
       {/* ============================================ */}
+      {/* ADD MEMBER SUCCESS MODAL */}
+      {/* ============================================ */}
+      {showAddSuccessModal && newMemberData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              </div>
+              <h2 className="text-xl font-bold text-black mb-2">
+                Member Added Successfully!
+              </h2>
+              <p className="text-gray-500 text-sm mb-2">
+                <span className="font-semibold text-black">
+                  {newMemberData.name}
+                </span>{" "}
+                has been added as{" "}
+                <span className="font-semibold text-black">
+                  {newMemberData.role}
+                </span>
+              </p>
+              <p className="text-gray-400 text-xs mb-6">
+                Email: {newMemberData.email}
+              </p>
+
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={handleGenerateInviteForNewMember}
+                  className="w-full bg-emerald-600 text-white font-semibold py-2.5 rounded-lg hover:bg-emerald-700 transition-all flex items-center justify-center gap-2"
+                >
+                  <Link className="w-4 h-4" />
+                  Send Invitation Link
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAddSuccessModal(false);
+                    setNewMemberData(null);
+                  }}
+                  className="w-full bg-gray-100 text-gray-700 font-medium py-2.5 rounded-lg hover:bg-gray-200 transition-all"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================ */}
       {/* EDIT MEMBER MODAL */}
       {/* ============================================ */}
       {showEditModal && selectedMember && (
@@ -1016,13 +1151,17 @@ const Members = () => {
       {/* ============================================ */}
       {/* INVITATION LINK MODAL */}
       {/* ============================================ */}
-      {showInviteModal && (
+      {showInviteModal && invitationLink && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-black">Invitation Link</h2>
               <button
-                onClick={() => setShowInviteModal(false)}
+                onClick={() => {
+                  setShowInviteModal(false);
+                  setInvitationLink("");
+                  setInviteModalData(null);
+                }}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-all"
               >
                 <XCircle className="w-5 h-5 text-gray-500" />
@@ -1030,9 +1169,39 @@ const Members = () => {
             </div>
 
             <div className="space-y-4">
+              {inviteModalData && (
+                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-sm text-gray-700 mb-1">
+                    <span className="font-semibold">To:</span>{" "}
+                    {inviteModalData.name}
+                  </p>
+                  <p className="text-sm text-gray-700 mb-1">
+                    <span className="font-semibold">Email:</span>{" "}
+                    {inviteModalData.email}
+                  </p>
+                  {inviteModalData.needsRegistration && (
+                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-xs text-yellow-700">
+                        ⚠️ This user doesn't have an account yet. They will need
+                        to register first.
+                      </p>
+                    </div>
+                  )}
+                  {inviteModalData.status &&
+                    inviteModalData.status !== "active" && (
+                      <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-xs text-blue-700">
+                          ℹ️ This invitation will help this user complete their
+                          registration.
+                        </p>
+                      </div>
+                    )}
+                </div>
+              )}
+
               <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                 <p className="text-xs text-gray-500 mb-2">
-                  Share this link with new members
+                  Share this link with the member
                 </p>
                 <div className="flex items-center gap-2">
                   <input
@@ -1061,7 +1230,11 @@ const Members = () => {
               </div>
 
               <button
-                onClick={() => setShowInviteModal(false)}
+                onClick={() => {
+                  setShowInviteModal(false);
+                  setInvitationLink("");
+                  setInviteModalData(null);
+                }}
                 className="w-full bg-gray-100 text-gray-700 font-medium py-2.5 rounded-lg hover:bg-gray-200 transition-all"
               >
                 Done

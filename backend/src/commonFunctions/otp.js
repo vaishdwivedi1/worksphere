@@ -207,3 +207,36 @@ setInterval(() => {
     }
   }
 }, 60000);
+
+// Improved email sending function with better formatting
+export const sendEmailMessage = async (email, link) => {
+  const mailOptions = {
+    from: process.env.NODEMAILER_EMAIL,
+    to: email,
+    subject: "Organization Registration Invitation",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
+        <h2 style="color: #333;">You've Been Invited!</h2>
+        <p style="color: #555;">You have been invited to join an organization. Click the button below to accept the invitation:</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${link}" style="background-color: #4CAF50; color: white; padding: 14px 28px; text-decoration: none; border-radius: 5px; font-size: 16px; display: inline-block;">
+            Accept Invitation
+          </a>
+        </div>
+        <p style="color: #888; font-size: 14px;">Or copy and paste this link into your browser:</p>
+        <p style="color: #4CAF50; word-break: break-all; background: #f5f5f5; padding: 10px; border-radius: 5px;">${link}</p>
+        <hr style="border: 1px solid #e0e0e0;">
+        <p style="color: #999; font-size: 12px;">This invitation will expire in 7 days. If you didn't request this, please ignore this email.</p>
+        <p style="color: #999; font-size: 12px;">This is an automated message, please do not reply.</p>
+      </div>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Invitation email sent to ${email}`);
+  } catch (error) {
+    console.error(`Failed to send email to ${email}:`, error);
+    throw new Error(`Email sending failed: ${error.message}`);
+  }
+};

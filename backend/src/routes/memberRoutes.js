@@ -5,7 +5,7 @@ import {
   deleteMember,
   changeStatusOfMember,
   generateMemberInvitationLink,
-  getAllMember,
+  getAllMember,verifyMemberInvitationLink
 } from "../controllers/memberControllers.js";
 
 const router = express.Router();
@@ -18,6 +18,10 @@ router.patch("/v1/organization/member/change-status", changeStatusOfMember);
 router.post(
   "/v1/organization/member/generate-invitation-link",
   generateMemberInvitationLink,
+);
+router.post(
+  "/v1/organization/member/verify-invitation-link",
+  verifyMemberInvitationLink,
 );
 
 export default router;
