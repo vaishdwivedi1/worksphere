@@ -406,8 +406,11 @@ const Members = () => {
     }
 
     try {
-      const memberId = selectedMember?.member_id || selectedMember?.id;
-      const response = await api.put(`${APIPATHS.updateMember}/${memberId}`, {
+      const userId = selectedMember?.user_id || selectedMember?.id;
+
+      const response = await api.put(APIPATHS.updateMember, {
+        userId: userId,
+        orgId: orgId,
         name: editFormData.name,
         phone: editPhone || "",
         role: editFormData.role,

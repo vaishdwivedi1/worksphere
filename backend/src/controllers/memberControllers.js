@@ -973,4 +973,141 @@ export const deleteMember = async (req, res) => {
     );
   }
 };
-export const updateMember = async (req, res) => {};
+export const updateMember = async (req, res) => {
+  const { userId, orgId, name, phone, role } = req.body;
+
+  // Validate required parameters
+  if (!orgId || !userId) {
+    return handleError(
+      res,
+      400,
+      "Missing required parameters: orgId, userId",
+      null,
+      "updateMember",
+    );
+  }
+
+  try {
+    // Check organization exists
+    const orgCheck = await pool.query(
+      `SELECT id FROM organizations WHERE id = $1`,
+      [orgId],
+    );
+
+    if (orgCheck.rows.length === 0) {
+      return handleError(
+        res,
+        404,
+        "Organization not found",
+        null,
+        "updateMember",
+      );
+    }
+
+    // Check if member exists in this organization using user_id
+    const memberCheck = await pool.query(
+      `SELECT * FROM organization_members 
+       WHERE organization_id = $1
+       AND user_id = $2`,
+      [orgId, userId],
+    );
+
+    if (memberCheck.rows.length === 0) {
+      return handleError(
+        res,
+        404,
+        "Member not found in this organization",
+        null,
+        "updateMember",
+      );
+    }
+
+    const member = memberCheck.rows[0];
+
+    // Check if user exists
+    const userExists = await pool.query("SELECT id FROM users WHERE id = $1", [
+      userId,
+    ]);
+
+    if (userExists.rows.length === 0) {
+      return handleError(
+        res,
+        404,
+        "User account not found",
+        null,
+        "updateMember",
+      );
+    }
+
+    // Start transaction
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      // Update users table
+      const userUpdateQuery = `
+        UPDATE users 
+        SET name = $1,
+            phone = $2,
+            updated_at = NOW()
+        WHERE id = $3
+        RETURNING id, name, email, phone, is_active, role, profile_picture, created_at, updated_at
+      `;
+
+      const userResult = await client.query(userUpdateQuery, [
+        name || member.name,
+        phone || member.phone,
+        userId,
+      ]);
+
+      // Update organization_members table
+      const memberUpdateQuery = `
+        UPDATE organization_members 
+        SET role = $1,
+            name = $2,
+            updated_at = NOW()
+        WHERE user_id = $3 AND organization_id = $4
+        RETURNING id, organization_id, user_id, email, role, status, department, created_at, updated_at
+      `;
+
+      const memberResult = await client.query(memberUpdateQuery, [
+        role || member.role,
+        name || member.name,
+        userId,
+        orgId,
+      ]);
+
+      await client.query("COMMIT");
+
+      // Combine both results
+      const updatedUser = userResult.rows[0];
+      const updatedMember = memberResult.rows[0];
+
+      return handleSuccess(
+        res,
+        200,
+        "Member updated successfully",
+        {
+          user: updatedUser,
+          member: updatedMember,
+        },
+        "updateMember",
+      );
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("Error in updateMember:", error);
+    return handleError(
+      res,
+      500,
+      "Failed to update member",
+      error,
+      "updateMember",
+    );
+  }
+};
