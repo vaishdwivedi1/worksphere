@@ -13,9 +13,9 @@ const router = express.Router();
 
 router.get("/v1/organization/members/:orgId", getAllMember);
 router.post("/v1/organization/member/add", addMember);
-router.post("/v1/organization/member/update", updateMember);
+router.put("/v1/organization/member/update", updateMember);
 router.delete("/v1/organization/member/delete", deleteMember);
-router.patch("/v1/organization/member/change-status", changeStatusOfMember);
+router.put("/v1/organization/member/change-status", changeStatusOfMember);
 router.post(
   "/v1/organization/member/generate-invitation-link",
   generateMemberInvitationLink,

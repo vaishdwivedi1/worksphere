@@ -680,6 +680,165 @@ export const verifyMemberInvitationLink = async (req, res) => {
     );
   }
 };
-export const updateMember = async (req, res) => {};
+export const changeStatusOfMember = async (req, res) => {
+  const { orgId, userId, status } = req.body; // ✅ Changed from req.query to req.body
+
+  // Validate required parameters
+  if (!orgId || !userId || !status) {
+    return handleError(
+      res,
+      400,
+      "Missing required parameters: orgId, userId, or status",
+      null,
+      "changeStatusOfMember",
+    );
+  }
+
+  // Validate status is one of allowed values
+  const validStatuses = ["pending", "active", "inactive", "suspended"];
+  if (!validStatuses.includes(status)) {
+    return handleError(
+      res,
+      400,
+      `Invalid status. Allowed values: ${validStatuses.join(", ")}`,
+      null,
+      "changeStatusOfMember",
+    );
+  }
+
+  try {
+    // Check organization exists
+    const orgCheck = await pool.query(
+      `SELECT id FROM organizations WHERE id = $1`,
+      [orgId],
+    );
+
+    if (orgCheck.rows.length === 0) {
+      return handleError(
+        res,
+        404,
+        "Organization not found",
+        null,
+        "changeStatusOfMember",
+      );
+    }
+
+    // Check if member exists in this organization
+    const memberCheck = await pool.query(
+      `SELECT * FROM organization_members 
+       WHERE organization_id = $1
+       AND user_id = $2`,
+      [orgId, userId],
+    );
+
+    if (memberCheck.rows.length === 0) {
+      return handleError(
+        res,
+        404,
+        "Member not found in this organization",
+        null,
+        "changeStatusOfMember",
+      );
+    }
+
+    const member = memberCheck.rows[0];
+
+    // Check if user exists
+    const userExists = await pool.query("SELECT id FROM users WHERE id = $1", [
+      userId,
+    ]);
+
+    if (userExists.rows.length === 0) {
+      return handleError(
+        res,
+        404,
+        "User account not found",
+        null,
+        "changeStatusOfMember",
+      );
+    }
+
+    // Check if member already has this status
+    if (member.status === status) {
+      return handleError(
+        res,
+        400,
+        `Member is already ${status}`,
+        null,
+        "changeStatusOfMember",
+      );
+    }
+
+    // ✅ Update member status
+    await pool.query(
+      `UPDATE organization_members 
+       SET status = $1,
+           updated_at = NOW()
+       WHERE user_id = $2
+       AND organization_id = $3`,
+      [status, userId, orgId],
+    );
+
+    // Update user active status based on member status
+    let userActive = false;
+    if (status === "active") {
+      userActive = true;
+    } else if (status === "inactive" || status === "suspended") {
+      userActive = false;
+    }
+    // For 'pending', keep user active status as is (or set to false)
+
+    await pool.query(
+      `UPDATE users 
+       SET is_active = $1,
+           updated_at = NOW()
+       WHERE id = $2`,
+      [userActive, userId],
+    );
+
+    // Fetch updated member data
+    const updatedMember = await pool.query(
+      `SELECT 
+        u.id AS user_id,
+        u.name,
+        u.email AS user_email,
+        u.phone,
+        u.profile_picture,
+        u.is_active AS user_active,
+        om.id AS member_id,
+        om.email AS member_email,
+        om.role,
+        om.status AS member_status,
+        om.department,
+        om.created_at AS joined_at,
+        om.updated_at AS member_updated_at
+      FROM users u
+      INNER JOIN organization_members om ON u.id = om.user_id
+      WHERE om.id = $1`,
+      [member.id],
+    );
+
+    return handleSuccess(
+      res,
+      200,
+      `Member status changed to ${status} successfully`,
+      {
+        member: updatedMember.rows[0],
+        organizationId: orgId,
+        newStatus: status,
+      },
+      "changeStatusOfMember",
+    );
+  } catch (error) {
+    console.error("Error in changeStatusOfMember:", error);
+    return handleError(
+      res,
+      500,
+      "Failed to change member status",
+      error,
+      "changeStatusOfMember",
+    );
+  }
+};
 export const deleteMember = async (req, res) => {};
-export const changeStatusOfMember = async (req, res) => {};
+export const updateMember = async (req, res) => {};

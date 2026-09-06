@@ -39,12 +39,14 @@ const Members = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showAddSuccessModal, setShowAddSuccessModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [newMemberData, setNewMemberData] = useState(null);
   const [invitationLink, setInvitationLink] = useState("");
   const [copySuccess, setCopySuccess] = useState(false);
   const [orgId, setOrgId] = useState(null);
   const [inviteModalData, setInviteModalData] = useState(null);
+  const [selectedStatus, setSelectedStatus] = useState("");
 
   // Pagination states
   const [page, setPage] = useState(1);
@@ -463,18 +465,18 @@ const Members = () => {
   };
 
   // ============================================
-  // CHANGE MEMBER STATUS
+  // CHANGE MEMBER STATUS WITH DROPDOWN
   // ============================================
-  const handleChangeStatus = async (memberId, currentStatus) => {
-    let newStatus;
-    if (currentStatus === "active") {
-      newStatus = "inactive";
-    } else if (currentStatus === "inactive") {
-      newStatus = "active";
-    } else if (currentStatus === "pending") {
-      newStatus = "active";
-    } else {
-      newStatus = "active";
+  const openStatusModal = (member) => {
+    setSelectedMember(member);
+    setSelectedStatus(member.member_status || member.status || "pending");
+    setShowStatusModal(true);
+  };
+
+  const handleChangeStatus = async () => {
+    if (!selectedMember || !selectedStatus) {
+      setError("Please select a status");
+      return;
     }
 
     setLoading(true);
@@ -482,15 +484,21 @@ const Members = () => {
     setSuccess("");
 
     try {
+      const userId = selectedMember?.user_id || selectedMember?.id;
+
       const response = await api.put(APIPATHS.changeStatusOfMember, {
-        memberId,
-        status: newStatus,
+        userId: userId,
+        orgId: orgId,
+        status: selectedStatus,
       });
 
       if (response.success) {
         setSuccess(
-          `Member ${newStatus === "active" ? "activated" : "deactivated"} successfully!`,
+          `Member status changed to ${selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1)} successfully!`,
         );
+        setShowStatusModal(false);
+        setSelectedMember(null);
+        setSelectedStatus("");
         setPage(1);
         setMembers([]);
         setHasMore(true);
@@ -633,13 +641,6 @@ const Members = () => {
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             <button
-              onClick={() => handleGenerateInvite()}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-medium"
-            >
-              <Link className="w-4 h-4" />
-              Invite Member
-            </button>
-            <button
               onClick={() => setShowAddModal(true)}
               className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-all text-sm font-medium"
             >
@@ -764,6 +765,15 @@ const Members = () => {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2">
+                          {/* Status Dropdown Button */}
+                          <button
+                            onClick={() => openStatusModal(member)}
+                            className="p-1.5 rounded-lg text-gray-600 hover:bg-gray-100 transition-all"
+                            title="Change Status"
+                          >
+                            <Shield className="w-4 h-4" />
+                          </button>
+
                           {/* Invite Button - Show for inactive users or users who haven't joined */}
                           {(status === "inactive" || status === "pending") && (
                             <button
@@ -774,28 +784,6 @@ const Members = () => {
                               <Link className="w-4 h-4" />
                             </button>
                           )}
-
-                          <button
-                            onClick={() => handleChangeStatus(memberId, status)}
-                            className={`p-1.5 rounded-lg transition-all ${
-                              status === "active"
-                                ? "text-green-600 hover:bg-green-50"
-                                : status === "pending"
-                                  ? "text-yellow-600 hover:bg-yellow-50"
-                                  : "text-red-600 hover:bg-red-50"
-                            }`}
-                            title={
-                              status === "active" ? "Deactivate" : "Activate"
-                            }
-                          >
-                            {status === "active" ? (
-                              <UserCheck className="w-4 h-4" />
-                            ) : status === "pending" ? (
-                              <UserPlus className="w-4 h-4" />
-                            ) : (
-                              <UserX className="w-4 h-4" />
-                            )}
-                          </button>
 
                           <button
                             onClick={() => openEditModal(member)}
@@ -1140,6 +1128,97 @@ const Members = () => {
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
                     "Delete"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================ */}
+      {/* CHANGE STATUS MODAL WITH DROPDOWN */}
+      {/* ============================================ */}
+      {showStatusModal && selectedMember && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-black">Change Status</h2>
+              <button
+                onClick={() => {
+                  setShowStatusModal(false);
+                  setSelectedMember(null);
+                  setSelectedStatus("");
+                }}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-all"
+              >
+                <XCircle className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">
+                  <span className="font-semibold">Member:</span>{" "}
+                  {selectedMember.name}
+                </p>
+                <p className="text-sm text-gray-600 mb-4">
+                  <span className="font-semibold">Current Status:</span>{" "}
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(
+                      selectedMember.member_status || selectedMember.status,
+                    )}`}
+                  >
+                    {(selectedMember.member_status || selectedMember.status)
+                      ?.charAt(0)
+                      .toUpperCase() +
+                      (
+                        selectedMember.member_status || selectedMember.status
+                      )?.slice(1)}
+                  </span>
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Select New Status *
+                </label>
+                <div className="relative">
+                  <Shield className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <select
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-black focus:outline-none focus:border-black focus:ring-2 focus:ring-black/10 transition-all appearance-none"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="suspended">Suspended</option>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    setShowStatusModal(false);
+                    setSelectedMember(null);
+                    setSelectedStatus("");
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleChangeStatus}
+                  disabled={loading}
+                  className="flex-1 px-4 py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    "Update Status"
                   )}
                 </button>
               </div>
