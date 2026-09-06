@@ -127,7 +127,7 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           label: "Dashboard",
           path: STATICPATHS.dashboard,
         },
-        { icon: Users, label: "Employees", path: STATICPATHS.employees },
+        { icon: Users, label: "Employees", path: STATICPATHS.members },
         { icon: Calendar, label: "Leave", path: STATICPATHS.leave },
         {
           icon: Megaphone,
@@ -135,7 +135,6 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           path: STATICPATHS.announcements,
         },
         { icon: Briefcase, label: "Jobs", path: STATICPATHS.jobs },
-        { icon: BarChart3, label: "HR Reports", path: STATICPATHS.hrReports },
       ],
       developer: [
         {

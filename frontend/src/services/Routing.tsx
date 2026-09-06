@@ -10,6 +10,7 @@ import STATICPATHS from "../utils/STATICPATHS";
 import Members from "../pages/Members";
 import Settings from "../pages/Settings";
 import AcceptInvitation from "../pages/AcceptInvitation";
+import HRJobs from "../pages/HRJobs";
 
 // ============================================
 // ERROR BOUNDARY
@@ -97,51 +98,10 @@ const Routing = () => {
               </MainLayout>
             }
           >
-            <Route
-              path="tasks"
-              element={
-                <div className="card p-6">
-                  <h2 className="text-heading text-xl font-bold mb-4">Tasks</h2>
-                  <p className="text-tertiary">Manage your tasks here.</p>
-                </div>
-              }
-            />
             <Route path={STATICPATHS.dashboard} element={<Dashboard />} />
             <Route path={STATICPATHS.members} element={<Members />} />
             <Route path={STATICPATHS.settings} element={<Settings />} />
-            <Route
-              path="employees"
-              element={
-                <div className="card p-6">
-                  <h2 className="text-heading text-xl font-bold mb-4">
-                    Employees
-                  </h2>
-                  <p className="text-tertiary">Manage your employees here.</p>
-                </div>
-              }
-            />
-            <Route
-              path="campaigns"
-              element={
-                <div className="card p-6">
-                  <h2 className="text-heading text-xl font-bold mb-4">
-                    Campaigns
-                  </h2>
-                  <p className="text-tertiary">Manage your campaigns here.</p>
-                </div>
-              }
-            />
-            <Route
-              path="analytics"
-              element={
-                <div className="card p-6">
-                  <h2 className="text-heading text-xl font-bold mb-4">
-                    Analytics
-                  </h2>
-                  <p className="text-tertiary">View your analytics here.</p>
-                </div>
-              }
-            />
+            <Route path={STATICPATHS.jobs} element={<HRJobs />} />
           </Route>
 
           {/* 404 Route */}
