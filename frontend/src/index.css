@@ -312,3 +312,7 @@ input:-webkit-autofill:active {
 button {
   cursor: pointer;
 }
+
+::-webkit-scrollbar {
+  display: none;
+}

@@ -9,15 +9,22 @@ import {
   refreshToken,
   verifyAndCreateOrganization,
 } from "../controllers/authControllers.js";
+import APIPATHS from "../utils/APIPATHS.js";
 
 const router = express.Router();
 
-router.post("/v1/auth/login", loginUser);
-router.post("/v1/organization/create", createOrganization);
-router.post("/v1/organization/verify-otp", verifyAndCreateOrganization);
-router.post("/v1/auth/forgot-password", forgotPassword);
-router.post("/v1/auth/change-password", changePassword);
-router.post("/v1/auth/logout", logout);
-router.post("/v1/auth/refresh-token", refreshToken);
+router.post(APIPATHS.login, loginUser);
+
+router.post(APIPATHS.createOrganization, createOrganization);
+
+router.post(APIPATHS.verifyOrganizationOTP, verifyAndCreateOrganization);
+
+router.post(APIPATHS.forgotPassword, forgotPassword);
+
+router.post(APIPATHS.changePassword, changePassword);
+
+router.post(APIPATHS.logout, logout);
+
+router.post(APIPATHS.refreshToken, refreshToken);
 
 export default router;

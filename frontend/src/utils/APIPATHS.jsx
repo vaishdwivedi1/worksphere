@@ -17,6 +17,16 @@ const APIPATHS = {
   changeStatusOfMember: "/worksphere/api/v1/organization/member/change-status",
   generateMemberInvitationLink:
     "/worksphere/api/v1/organization/member/generate-invitation-link",
+
+  // teams
+  getAllTeams: "/worksphere/api/v1/organization/teams",
+  getTeamById: "/worksphere/api/v1/organization/team",
+  createTeam: "/worksphere/api/v1/organization/team/create",
+  updateTeam: "/worksphere/api/v1/organization/team/update",
+  deleteTeam: "/worksphere/api/v1/organization/team/delete",
+  getTeamMembers: "/worksphere/api/v1/organization/team/members",
+  addTeamMember: "/worksphere/api/v1/organization/team/members/add",
+  removeTeamMember: "/worksphere/api/v1/organization/team/members/remove",
 };
 
 export default APIPATHS;

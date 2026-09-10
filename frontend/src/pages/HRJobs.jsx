@@ -51,7 +51,6 @@ const HRJobs = () => {
   const [showJobModal, setShowJobModal] = useState(false);
   const [showCandidateModal, setShowCandidateModal] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
-  const [viewMode, setViewMode] = useState("list"); // list, kanban
 
   // Sample Data
   const jobs = [
@@ -279,52 +278,54 @@ const HRJobs = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
-        {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+    <div className="w-full overflow-scroll h-[80dvh]">
+      {/* Header with Stats */}
+      <div className="flex justify-between items-center w-full gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 flex-1">
           {[
             {
               label: "Jobs",
               value: jobs.length,
               icon: Briefcase,
               color: "text-blue-600",
+              bg: "bg-blue-50",
             },
             {
               label: "Positions",
               value: jobs.filter((j) => j.status === "Open").length,
               icon: Play,
               color: "text-green-600",
+              bg: "bg-green-50",
             },
             {
               label: "Applicants",
               value: jobs.reduce((acc, j) => acc + j.applicants, 0),
               icon: Users,
               color: "text-purple-600",
+              bg: "bg-purple-50",
             },
             {
               label: "On Hold",
               value: jobs.filter((j) => j.status === "On Hold").length,
               icon: Clock,
               color: "text-yellow-600",
+              bg: "bg-yellow-50",
             },
             {
               label: "Filled",
               value: jobs.filter((j) => j.status === "Filled").length,
               icon: CheckCircle,
               color: "text-emerald-600",
+              bg: "bg-emerald-50",
             },
           ].map((stat, index) => (
             <div
               key={index}
-              className="bg-white rounded-xl border border-gray-200 p-2"
+              className="bg-white rounded-xl border border-gray-200 p-3"
             >
               <div className="flex items-center gap-3">
-                <div
-                  className={`p-2 rounded-lg bg-${stat.color.split("-")[1]}-50`}
-                >
-                  <stat.icon className={`w-5 h-5 ${stat.color}`} />
+                <div className={`p-2 rounded-lg ${stat.bg}`}>
+                  <stat.icon className={`w-4 h-4 ${stat.color}`} />
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">{stat.label}</p>
@@ -336,19 +337,17 @@ const HRJobs = () => {
             </div>
           ))}
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowJobModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-medium"
-          >
-            <Plus className="w-4 h-4" />
-            Create Job
-          </button>
-        </div>
+        <button
+          onClick={() => setShowJobModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-medium whitespace-nowrap"
+        >
+          <Plus className="w-4 h-4" />
+          Create Job
+        </button>
       </div>
 
       {/* Search & Filters */}
-      <div className="flex flex-wrap items-center gap-4 mb-6">
+      <div className="flex flex-wrap items-center gap-3 mb-6">
         <div className="flex-1 min-w-[200px] relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
@@ -375,7 +374,7 @@ const HRJobs = () => {
       </div>
 
       {/* Jobs Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {jobs.map((job) => (
           <div
             key={job.id}
@@ -383,19 +382,19 @@ const HRJobs = () => {
           >
             {/* Job Header */}
             <div className="p-4 border-b border-gray-100 flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-lg font-semibold text-gray-800">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <h3 className="text-base font-semibold text-gray-800 truncate">
                     {job.title}
                   </h3>
                   <span
-                    className={`px-2 py-0.5 rounded-full text-xs font-medium border flex items-center gap-1 ${statusColors[job.status]}`}
+                    className={`px-2 py-0.5 rounded-full text-xs font-medium border flex items-center gap-1 whitespace-nowrap ${statusColors[job.status]}`}
                   >
                     {getStatusIcon(job.status)}
                     {job.status}
                   </span>
                 </div>
-                <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
                   <span className="flex items-center gap-1">
                     <Building className="w-3 h-3" />
                     {job.department}
@@ -418,26 +417,26 @@ const HRJobs = () => {
 
             {/* Job Body */}
             <div className="p-4">
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="bg-gray-50 rounded-lg p-3">
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="bg-gray-50 rounded-lg p-2">
                   <p className="text-xs text-gray-500">Applicants</p>
-                  <p className="text-lg font-bold text-gray-800">
+                  <p className="text-base font-bold text-gray-800">
                     {job.applicants}
                   </p>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3">
+                <div className="bg-gray-50 rounded-lg p-2">
                   <p className="text-xs text-gray-500">Rounds</p>
-                  <p className="text-lg font-bold text-gray-800">
+                  <p className="text-base font-bold text-gray-800">
                     {job.rounds}
                   </p>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3">
+                <div className="bg-gray-50 rounded-lg p-2">
                   <p className="text-xs text-gray-500">Created</p>
                   <p className="text-sm font-medium text-gray-800">
                     {job.createdAt}
                   </p>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3">
+                <div className="bg-gray-50 rounded-lg p-2">
                   <p className="text-xs text-gray-500">Type</p>
                   <p className="text-sm font-medium text-gray-800">
                     {job.employmentType}
@@ -446,7 +445,7 @@ const HRJobs = () => {
               </div>
 
               {/* Skills */}
-              <div className="flex flex-wrap gap-1.5 mb-4">
+              <div className="flex flex-wrap gap-1.5 mb-3">
                 {job.skills.map((skill, idx) => (
                   <span
                     key={idx}
@@ -458,21 +457,21 @@ const HRJobs = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
+              <div className="flex items-center gap-1.5 pt-3 border-t border-gray-100 flex-wrap">
                 <button
                   onClick={() => setSelectedJob(job)}
-                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-all text-xs font-medium"
+                  className="flex items-center justify-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-all text-xs font-medium"
                 >
                   View Details
                 </button>
-                <button className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all text-xs font-medium">
+                <button className="flex items-center justify-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all text-xs font-medium">
                   <Edit className="w-3.5 h-3.5" />
                   Edit
                 </button>
-                <button className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-all text-xs font-medium">
+                <button className="flex items-center justify-center gap-1 px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-all text-xs font-medium">
                   <Archive className="w-3.5 h-3.5" />
                 </button>
-                <button className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all text-xs font-medium">
+                <button className="flex items-center justify-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all text-xs font-medium">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -499,7 +498,7 @@ const HRJobs = () => {
 
             <div className="p-6 space-y-6">
               {/* Basic Info */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
                   {
                     label: "Department",
@@ -656,7 +655,7 @@ const HRJobs = () => {
                     View All ({selectedJob.candidates.length})
                   </button>
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {selectedJob.candidates.map((candidate) => (
                     <div
                       key={candidate.id}
@@ -666,27 +665,27 @@ const HRJobs = () => {
                         setShowCandidateModal(true);
                       }}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-sm">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-sm flex-shrink-0">
                           {candidate.name.charAt(0)}
                         </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-800">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">
                             {candidate.name}
                           </p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-gray-500 truncate">
                             {candidate.email}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 flex-shrink-0">
                         <span
                           className={`px-2 py-0.5 rounded-full text-xs font-medium border flex items-center gap-1 ${candidateStatusColors[candidate.status]}`}
                         >
                           {getCandidateStatusIcon(candidate.status)}
                           {candidate.status}
                         </span>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-gray-500 hidden sm:inline">
                           {candidate.experience}
                         </span>
                       </div>
@@ -704,22 +703,22 @@ const HRJobs = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between z-10">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-lg">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-lg flex-shrink-0">
                   {selectedCandidate.name.charAt(0)}
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold text-gray-800">
+                <div className="min-w-0">
+                  <h2 className="text-xl font-bold text-gray-800 truncate">
                     {selectedCandidate.name}
                   </h2>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-500 truncate">
                     {selectedCandidate.email}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowCandidateModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-all"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-all flex-shrink-0"
               >
                 <XCircle className="w-5 h-5 text-gray-500" />
               </button>
@@ -727,7 +726,7 @@ const HRJobs = () => {
 
             <div className="p-6 space-y-6">
               {/* Candidate Info */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 {[
                   {
                     label: "Phone",
@@ -764,7 +763,7 @@ const HRJobs = () => {
                     <p className="text-xs text-gray-500">{item.label}</p>
                     <p className="text-sm font-medium text-gray-800 flex items-center gap-1.5">
                       <item.icon className="w-3.5 h-3.5 text-gray-400" />
-                      {item.value}
+                      <span className="truncate">{item.value}</span>
                     </p>
                   </div>
                 ))}
@@ -783,7 +782,7 @@ const HRJobs = () => {
                           key={idx}
                           className="border border-gray-200 rounded-lg p-4"
                         >
-                          <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center justify-between mb-2 flex-wrap">
                             <div>
                               <p className="text-sm font-medium text-gray-800">
                                 {interview.round}
@@ -802,7 +801,7 @@ const HRJobs = () => {
                               {interview.result}
                             </span>
                           </div>
-                          <div className="flex items-center gap-4 text-xs text-gray-600">
+                          <div className="flex items-center gap-4 text-xs text-gray-600 flex-wrap">
                             <span>Score: {interview.score}%</span>
                             <span>•</span>
                             <span>{interview.type}</span>
@@ -829,16 +828,16 @@ const HRJobs = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
-                <button className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-medium">
+              <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-200">
+                <button className="flex-1 min-w-[120px] flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-medium">
                   <UserCheck className="w-4 h-4" />
                   Schedule Interview
                 </button>
-                <button className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all text-sm font-medium">
+                <button className="flex-1 min-w-[120px] flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all text-sm font-medium">
                   <MessageSquare className="w-4 h-4" />
                   Send Message
                 </button>
-                <button className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all text-sm font-medium">
+                <button className="flex-1 min-w-[120px] flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all text-sm font-medium">
                   <XCircle className="w-4 h-4" />
                   Reject
                 </button>
@@ -866,7 +865,7 @@ const HRJobs = () => {
 
             <div className="p-6">
               <form className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
                       Job Title *
@@ -992,17 +991,17 @@ const HRJobs = () => {
                   ></textarea>
                 </div>
 
-                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-200">
                   <button
                     type="submit"
-                    className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-medium"
+                    className="flex-1 min-w-[120px] px-4 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-medium"
                   >
                     Create Job
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowJobModal(false)}
-                    className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all text-sm font-medium"
+                    className="flex-1 min-w-[120px] px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all text-sm font-medium"
                   >
                     Cancel
                   </button>

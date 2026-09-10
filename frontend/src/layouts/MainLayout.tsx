@@ -521,7 +521,7 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </header>
 
         {/* Page Content */}
-        <main className="p-4 md:p-6">{children}</main>
+        <main className="p-4 md:p-6 flex flex-col flex-1">{children}</main>
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import pool from "./src/config/postgres.js";
 
 import authRoutes from "./src/routes/authRoutes.js";
 import memberRoutes from "./src/routes/memberRoutes.js";
+import teamRoutes from "./src/routes/teamRoutes.js";
 import { createTables } from "./src/postgresDatabase.js/database.js";
 import { resetDatabase } from "./src/commonFunctions/reset-database.js";
 import cors from "cors";
@@ -24,6 +25,7 @@ app.use(
 // routes
 app.use("/worksphere/api/", authRoutes);
 app.use("/worksphere/api/", memberRoutes);
+app.use("/worksphere/api/", teamRoutes);
 
 app.get("/", (req, res) => {
   res.json({
@@ -35,6 +37,7 @@ const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   try {
+    console.log("coming");
     await pool.query("SELECT 1");
     console.log("PostgreSQL connected");
 
@@ -50,6 +53,7 @@ const startServer = async () => {
     });
   } catch (error) {
     console.error("Server startup failed:", error.message);
+    console.error("Server startup failed:", error);
   }
 };
 

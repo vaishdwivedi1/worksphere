@@ -147,6 +147,73 @@ CREATE TABLE organization_members (
 
 
 -- ============================================
+-- TABLE 4: TEAMS - Organization ke teams
+-- ============================================
+-- kya hai: yeh table store karti hai sabhi teams ko (predefined + custom)
+-- Important:
+-- - predefined teams sabho orgs mai available hain  (is_predefined = true)
+-- - custome teams sirf PRO/PREMIUM org bna skti hai (is_predefined = false)
+-- ============================================
+
+CREATE TABLE teams (
+    -- primary key
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+
+
+    -- team ka naam
+    name VARCHAR(255) NOT NULL,
+
+    -- team ka desc optional 
+    description TEXT,
+
+    -- Kya yeh predefined team hai? 
+    -- TRUE = system-generated (Frontend, Backend, DevOps, HR, Sales, Marketing, Designers, Finance)
+    -- FALSE = custom team (sirf PRO/PREMIUM orgs)
+    is_predefined BOOLEAN NOT NULL DEFAULT FALSE,
+
+    predefined_type VARCHAR(50),
+
+     -- Team active hai ya nahi
+    is_active BOOLEAN DEFAULT TRUE,
+
+
+     -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+);
+
+CREATE TABLE organization_teams (
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    PRIMARY KEY (organization_id, team_id)
+);
+
+
+-- ============================================
+-- TABLE 5: TEAM_MEMBERS - Team aur Members ka junction
+-- ============================================
+-- Kya hai: Yeh table connect karti hai team members ko teams se
+-- Important: Ek member multiple teams mein ho sakta hai
+-- ============================================
+
+CREATE TABLE team_members (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    team_id UUID NOT NULL
+        REFERENCES teams(id)
+        ON DELETE CASCADE,
+
+    member_id UUID NOT NULL
+        REFERENCES organization_members(id)
+        ON DELETE CASCADE,
+
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE (team_id, member_id)
+);
+
+-- ============================================
 -- PERFORMANCE INDEXES - Database ko fast banane ke liye
 -- ============================================
 -- Yeh indexes queries ko 10x faster kar dete hain
@@ -266,7 +333,6 @@ CREATE INDEX idx_om_admin ON organization_members (organization_id) WHERE role =
 -- ============================================
 
 CREATE INDEX idx_om_department ON organization_members (department);
-
 -- ============================================
 -- BONUS: Check kaunsa index use ho raha hai
 -- ============================================
@@ -290,3 +356,86 @@ CREATE INDEX idx_om_department ON organization_members (department);
 -- 10. Show admin members:   idx_om_admin (partial index - fastest!)
 -- 11. Filter by department: idx_om_department
 -- ============================================
+
+
+
+
+-- auto triggers
+
+CREATE OR REPLACE FUNCTION link_predefined_teams_to_org()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO organization_teams (organization_id, team_id)
+    SELECT NEW.id, t.id
+    FROM teams t
+    WHERE t.is_predefined = TRUE
+    ON CONFLICT (organization_id, team_id) DO NOTHING;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_link_predefined_teams
+AFTER INSERT ON organizations
+FOR EACH ROW
+EXECUTE FUNCTION link_predefined_teams_to_org();
+
+
+CREATE OR REPLACE FUNCTION inc_team_member_count()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_org_id UUID;
+BEGIN
+    -- Pata karo ye member kis org ka hai
+    SELECT organization_id INTO v_org_id
+    FROM organization_members
+    WHERE id = NEW.member_id;
+
+    -- Us org-team row ka count badha do
+    UPDATE organization_teams
+    SET member_count = member_count + 1
+    WHERE organization_id = v_org_id
+      AND team_id = NEW.team_id;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_tm_insert
+AFTER INSERT ON team_members
+FOR EACH ROW
+EXECUTE FUNCTION inc_team_member_count();
+
+CREATE OR REPLACE FUNCTION dec_team_member_count()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_org_id UUID;
+BEGIN
+    SELECT organization_id INTO v_org_id
+    FROM organization_members
+    WHERE id = OLD.member_id;
+
+    UPDATE organization_teams
+    SET member_count = GREATEST(member_count - 1, 0)
+    WHERE organization_id = v_org_id
+      AND team_id = OLD.team_id;
+
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_tm_delete
+AFTER DELETE ON team_members
+FOR EACH ROW
+EXECUTE FUNCTION dec_team_member_count();
+
+CREATE OR REPLACE FUNCTION link_predefined_teams_to_org()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO organization_teams (organization_id, team_id, member_count)
+    SELECT NEW.id, t.id, 0
+    FROM teams t
+    WHERE t.is_predefined = TRUE
+    ON CONFLICT (organization_id, team_id) DO NOTHING;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;

@@ -1,4 +1,5 @@
 import express from "express";
+
 import {
   addMember,
   updateMember,
@@ -8,21 +9,25 @@ import {
   getAllMember,
   verifyMemberInvitationLink,
 } from "../controllers/memberControllers.js";
+import APIPATHS from "../utils/APIPATHS.js";
 
 const router = express.Router();
 
-router.get("/v1/organization/members/:orgId", getAllMember);
-router.post("/v1/organization/member/add", addMember);
-router.put("/v1/organization/member/update", updateMember);
-router.delete("/v1/organization/member/delete", deleteMember);
-router.put("/v1/organization/member/change-status", changeStatusOfMember);
+router.get(APIPATHS.getAllMembers, getAllMember);
+
+router.post(APIPATHS.addMember, addMember);
+
+router.put(APIPATHS.updateMember, updateMember);
+
+router.delete(APIPATHS.deleteMember, deleteMember);
+
+router.put(APIPATHS.changeMemberStatus, changeStatusOfMember);
+
 router.post(
-  "/v1/organization/member/generate-invitation-link",
+  APIPATHS.generateMemberInvitationLink,
   generateMemberInvitationLink,
 );
-router.get(
-  "/v1/organization/member/verify-invitation-link",
-  verifyMemberInvitationLink,
-);
+
+router.get(APIPATHS.verifyMemberInvitationLink, verifyMemberInvitationLink);
 
 export default router;
