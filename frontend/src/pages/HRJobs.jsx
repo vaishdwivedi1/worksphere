@@ -144,7 +144,7 @@ const useDebounced = (value, delay = 400) => {
 const emptyForm = () => ({
   title: "",
   department: "",
-  team: "",
+  team: "", // Will store team name/id
   experience: "",
   employmentType: "full-time",
   location: "remote",
@@ -153,7 +153,7 @@ const emptyForm = () => ({
   requirements: "",
   skills: "",
   rounds: 3,
-  screeningQuestions: [""], // Array of strings for dynamic UI
+  screeningQuestions: [""],
 });
 
 const HRJobs = () => {
@@ -167,6 +167,7 @@ const HRJobs = () => {
   const [editingJob, setEditingJob] = useState(null);
 
   const [jobs, setJobs] = useState([]);
+  const [teams, setTeams] = useState([]); // TEAMS STATE
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -178,7 +179,6 @@ const HRJobs = () => {
 
   const [jobForm, setJobForm] = useState(emptyForm());
 
-  // Candidate Add Form state
   const [candidateForm, setCandidateForm] = useState({
     name: "",
     email: "",
@@ -188,7 +188,6 @@ const HRJobs = () => {
     resume_url: "",
   });
 
-  // Interview Form state
   const [interviewForm, setInterviewForm] = useState({
     round_name: "",
     interviewer: "",
@@ -250,9 +249,26 @@ const HRJobs = () => {
     }
   }, [organizationId, statusFilter, deptFilter, debouncedSearch]);
 
+  // Fetch Teams API
+  const fetchTeams = useCallback(async () => {
+    if (!organizationId) return;
+    try {
+      const response = await api.get(
+        `${APIPATHS.getAllTeams}/${organizationId}`,
+      );
+      // Handle API response shape (assuming response.data is an array)
+      const teamsList = response.data || response || [];
+      setTeams(Array.isArray(teamsList) ? teamsList : []);
+    } catch (err) {
+      console.error("fetchTeams error:", err);
+      // Do not block job fetch if teams fail
+    }
+  }, [organizationId]);
+
   useEffect(() => {
     fetchJobsApi();
-  }, [fetchJobsApi]);
+    fetchTeams();
+  }, [fetchJobsApi, fetchTeams]);
 
   const fetchCandidatesByJobApi = async (jobId) => {
     try {
@@ -309,7 +325,6 @@ const HRJobs = () => {
       requirements: (job.requirements || []).join("\n"),
       skills: (job.skills || []).join(", "),
       rounds: job.rounds || 1,
-      // Convert existing array to dynamic fields (ensure at least 1 input)
       screeningQuestions:
         job.screeningQuestions.length > 0 ? job.screeningQuestions : [""],
     });
@@ -356,7 +371,6 @@ const HRJobs = () => {
         .map((s) => s.trim())
         .filter(Boolean);
 
-      // Filter out empty screening questions
       const screening_questions = jobForm.screeningQuestions.filter(
         (q) => q.trim() !== "",
       );
@@ -374,7 +388,7 @@ const HRJobs = () => {
         organization_id: organizationId,
         title: jobForm.title.trim(),
         department: jobForm.department,
-        team: jobForm.team.trim() || null,
+        team: jobForm.team || null, // TEAM ID/NAME
         experience_required: jobForm.experience || null,
         employment_type:
           jobForm.employmentType.charAt(0).toUpperCase() +
@@ -386,7 +400,7 @@ const HRJobs = () => {
         requirements,
         skills,
         hiring_workflow,
-        screening_questions, // Array of strings
+        screening_questions,
         total_rounds: roundsNum,
         status: editingJob ? undefined : "Draft",
       };
@@ -410,7 +424,6 @@ const HRJobs = () => {
     }
   };
 
-  // --- Candidate Handlers ---
   const handleViewCandidate = async (candidate) => {
     setSelectedCandidate(candidate);
     setShowCandidateModal(true);
@@ -449,10 +462,9 @@ const HRJobs = () => {
       const res = await createCandidateApi(payload);
       if (res?.success) {
         setShowAddCandidateModal(false);
-        // Refresh candidates list in the modal
         const candidates = await fetchCandidatesByJobApi(selectedJob.id);
         setSelectedJob((prev) => (prev ? { ...prev, candidates } : prev));
-        fetchJobsApi(); // Refresh jobs to update total_applicants count
+        fetchJobsApi();
       } else {
         alert(res?.message || "Failed to add candidate");
       }
@@ -483,7 +495,6 @@ const HRJobs = () => {
     }
   };
 
-  // --- Interview Handlers ---
   const handleScheduleInterview = (candidate) => {
     setInterviewForm({
       round_name: "",
@@ -525,7 +536,6 @@ const HRJobs = () => {
     }
   };
 
-  // --- Dynamic Screening Questions Handlers ---
   const handleAddQuestion = () => {
     setJobForm({
       ...jobForm,
@@ -540,12 +550,11 @@ const HRJobs = () => {
   };
 
   const handleRemoveQuestion = (index) => {
-    if (jobForm.screeningQuestions.length === 1) return; // keep at least one
+    if (jobForm.screeningQuestions.length === 1) return;
     const newQs = jobForm.screeningQuestions.filter((_, i) => i !== index);
     setJobForm({ ...jobForm, screeningQuestions: newQs });
   };
 
-  // --- Styling Helpers ---
   const statusColors = {
     Open: "bg-green-100 text-green-700 border-green-200",
     Draft: "bg-gray-100 text-gray-700 border-gray-200",
@@ -604,7 +613,7 @@ const HRJobs = () => {
 
   return (
     <div className="w-full overflow-scroll h-[80dvh]">
-      {/* Header, Stats, Search etc. (Same as before) */}
+      {/* Header, Stats, Search etc. */}
       <div className="flex justify-between items-center w-full gap-4 mb-6">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 flex-1">
           {[
@@ -1008,7 +1017,6 @@ const HRJobs = () => {
                 </div>
               </div>
 
-              {/* CANDIDATES SECTION with ADD CANDIDATE button */}
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-sm font-semibold text-gray-700">
@@ -1271,18 +1279,25 @@ const HRJobs = () => {
                       <option value="HR">HR</option>
                     </select>
                   </div>
+                  {/* TEAMS DROPDOWN */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
                       Team
                     </label>
-                    <input
-                      type="text"
+                    <select
                       value={jobForm.team}
                       onChange={(e) =>
                         setJobForm({ ...jobForm, team: e.target.value })
                       }
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:border-emerald-500"
-                    />
+                    >
+                      <option value="">Select Team</option>
+                      {teams.map((t) => (
+                        <option key={t.id} value={t.name}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
