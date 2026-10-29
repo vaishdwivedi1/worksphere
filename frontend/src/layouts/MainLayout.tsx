@@ -100,7 +100,12 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         },
         { icon: Users, label: "Members", path: STATICPATHS.members },
         { icon: UserCog, label: "Teams", path: STATICPATHS.teams },
-        { icon: Users, label: "HR", path: STATICPATHS.hr },
+        {
+          icon: Megaphone,
+          label: "Announcements",
+          path: STATICPATHS.announcements,
+        },
+        { icon: Briefcase, label: "Jobs", path: STATICPATHS.jobs },
         { icon: Gauge, label: "Sales", path: STATICPATHS.sales },
         { icon: Megaphone, label: "Marketing", path: STATICPATHS.marketing },
         { icon: Code, label: "Development", path: STATICPATHS.development },

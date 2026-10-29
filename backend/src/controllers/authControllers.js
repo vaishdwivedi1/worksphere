@@ -1,4 +1,3 @@
-// src/controllers/authControllers.js
 import { handleError, handleSuccess } from "../commonFunctions/commonError.js";
 import {
   generateEmailMobileOTP,

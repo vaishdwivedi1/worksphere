@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+import cors from "cors";
 
 import connectMongoDB from "./src/config/mongodb.js";
 import pool from "./src/config/postgres.js";
@@ -7,9 +8,11 @@ import pool from "./src/config/postgres.js";
 import authRoutes from "./src/routes/authRoutes.js";
 import memberRoutes from "./src/routes/memberRoutes.js";
 import teamRoutes from "./src/routes/teamRoutes.js";
-import { createTables } from "./src/postgresDatabase.js/database.js";
+import jobRoutes from "./src/routes/jobRoutes.js";
+import candidateRoutes from "./src/routes/candidateRoutes.js";
+import interviewRoutes from "./src/routes/interviewRoutes.js";
 import { resetDatabase } from "./src/commonFunctions/reset-database.js";
-import cors from "cors";
+import { createTables } from "./src/postgresDatabase.js/database.js";
 
 dotenv.config();
 
@@ -19,17 +22,31 @@ app.use(express.json());
 app.use(
   cors({
     origin: "http://localhost:5173",
+    credentials: true,
   }),
 );
 
-// routes
-app.use("/worksphere/api/", authRoutes);
-app.use("/worksphere/api/", memberRoutes);
-app.use("/worksphere/api/", teamRoutes);
+// ============================================
+// ROUTES — all under /worksphere/api
+// Each router internally adds /v1/<resource>
+// ============================================
+app.use("/worksphere/api", authRoutes);
+app.use("/worksphere/api", memberRoutes);
+app.use("/worksphere/api", teamRoutes);
+app.use("/worksphere/api", jobRoutes);
+app.use("/worksphere/api", candidateRoutes);
+app.use("/worksphere/api", interviewRoutes);
 
+// Health check
 app.get("/", (req, res) => {
-  res.json({
-    message: "WorkSphere API is running",
+  res.json({ message: "WorkSphere API is running" });
+});
+
+// 404 handler — MUST be last, after all routes
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Route not found: ${req.method} ${req.originalUrl}`,
   });
 });
 
@@ -37,22 +54,17 @@ const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   try {
-    console.log("coming");
     await pool.query("SELECT 1");
     console.log("PostgreSQL connected");
 
-    // create tables
+    await createTables();
     // resetDatabase();
-
-    createTables();
-
     await connectMongoDB();
 
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
   } catch (error) {
-    console.error("Server startup failed:", error.message);
     console.error("Server startup failed:", error);
   }
 };
