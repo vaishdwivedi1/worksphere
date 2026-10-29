@@ -41,7 +41,7 @@ import { api } from "../services/api";
 import APIPATHS from "../utils/APIPATHS";
 
 // ============================================
-// PATH BUILDER
+// PATH BUILDER — replaces :param placeholders
 // ============================================
 const buildPath = (template, params = {}) =>
   template.replace(/:([a-zA-Z_][a-zA-Z0-9_]*)/g, (_, key) =>
@@ -50,6 +50,7 @@ const buildPath = (template, params = {}) =>
       : "",
   );
 
+// Safely parse arrays from API (handles JSONB / TEXT[] / JSON strings)
 const asArray = (val) => {
   if (Array.isArray(val)) return val;
   if (val === null || val === undefined || val === "") return [];
@@ -70,7 +71,7 @@ const asArray = (val) => {
 };
 
 // ============================================
-// MAPPERS
+// MAPPERS (snake_case API → camelCase UI)
 // ============================================
 const mapJobFromApi = (j) => {
   let normalizedScreening = [];
@@ -138,6 +139,9 @@ const mapCandidateFromApi = (c) => ({
   _raw: c,
 });
 
+// ============================================
+// DEBOUNCE HOOK
+// ============================================
 const useDebounced = (value, delay = 400) => {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -191,7 +195,7 @@ const HRJobs = () => {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [deptFilter, setDeptFilter] = useState("all");
+  const [teamFilter, setTeamFilter] = useState("all"); // ✅ team filter
   const debouncedSearch = useDebounced(searchQuery, 400);
 
   const [jobForm, setJobForm] = useState(emptyForm());
@@ -229,7 +233,7 @@ const HRJobs = () => {
   const fetchSeq = useRef(0);
 
   // ============================================
-  // CONFIRM HELPER (Toast-style custom modal)
+  // CONFIRM HELPER
   // ============================================
   const confirmAction = (title, message) =>
     new Promise((resolve) => {
@@ -265,7 +269,7 @@ const HRJobs = () => {
       const params = new URLSearchParams();
       params.append("organization_id", organizationId);
       if (statusFilter !== "all") params.append("status", statusFilter);
-      if (deptFilter !== "all") params.append("department", deptFilter);
+      if (teamFilter !== "all") params.append("team", teamFilter); // ✅ team
       if (debouncedSearch.trim())
         params.append("search", debouncedSearch.trim());
 
@@ -288,7 +292,7 @@ const HRJobs = () => {
     } finally {
       if (seq === fetchSeq.current) setLoading(false);
     }
-  }, [organizationId, statusFilter, deptFilter, debouncedSearch]);
+  }, [organizationId, statusFilter, teamFilter, debouncedSearch]);
 
   const fetchTeams = useCallback(async () => {
     if (!organizationId) return;
@@ -649,7 +653,7 @@ const HRJobs = () => {
   };
 
   // ============================================
-  // STYLING
+  // STYLING HELPERS
   // ============================================
   const statusColors = {
     Open: "bg-green-100 text-green-700 border-green-200",
@@ -746,88 +750,7 @@ const HRJobs = () => {
         </div>
       )}
 
-      {/* Stats & Header */}
-      <div className="flex justify-between items-center w-full gap-4 mb-6">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 flex-1">
-          {[
-            {
-              label: "Jobs",
-              value: jobs.length,
-              icon: Briefcase,
-              color: "text-blue-600",
-              bg: "bg-blue-50",
-            },
-            {
-              label: "Positions",
-              value: jobs.filter((j) => j.status === "Open").length,
-              icon: Play,
-              color: "text-green-600",
-              bg: "bg-green-50",
-            },
-            {
-              label: "Applicants",
-              value: jobs.reduce((acc, j) => acc + (j.applicants || 0), 0),
-              icon: Users,
-              color: "text-purple-600",
-              bg: "bg-purple-50",
-            },
-            {
-              label: "On Hold",
-              value: jobs.filter((j) => j.status === "On Hold").length,
-              icon: Clock,
-              color: "text-yellow-600",
-              bg: "bg-yellow-50",
-            },
-            {
-              label: "Filled",
-              value: jobs.filter((j) => j.status === "Filled").length,
-              icon: CheckCircle,
-              color: "text-emerald-600",
-              bg: "bg-emerald-50",
-            },
-          ].map((stat, index) => (
-            <div
-              key={index}
-              className="bg-white rounded-xl border border-gray-200 p-3"
-            >
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${stat.bg}`}>
-                  <stat.icon className={`w-4 h-4 ${stat.color}`} />
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">{stat.label}</p>
-                  <p className="text-lg font-bold text-gray-800">
-                    {stat.value}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={fetchJobsApi}
-            disabled={loading}
-            className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-60"
-          >
-            <RefreshCw
-              className={`w-4 h-4 text-gray-600 ${loading ? "animate-spin" : ""}`}
-            />
-          </button>
-          <button
-            onClick={() => {
-              setEditingJob(null);
-              setJobForm(emptyForm());
-              setShowJobModal(true);
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-medium whitespace-nowrap"
-          >
-            <Plus className="w-4 h-4" /> Create Job
-          </button>
-        </div>
-      </div>
-
-      {/* Filters */}
+      {/* Filters — Team filter instead of Department */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
         <div className="flex-1 min-w-[200px] relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -851,18 +774,31 @@ const HRJobs = () => {
           <option value="On Hold">On Hold</option>
           <option value="Filled">Filled</option>
         </select>
+
+        {/* ✅ TEAM dropdown (dynamic from teams API) */}
         <select
-          value={deptFilter}
-          onChange={(e) => setDeptFilter(e.target.value)}
+          value={teamFilter}
+          onChange={(e) => setTeamFilter(e.target.value)}
           className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-black focus:outline-none focus:border-emerald-500"
         >
-          <option value="all">All Departments</option>
-          <option value="Engineering">Engineering</option>
-          <option value="Design">Design</option>
-          <option value="Marketing">Marketing</option>
-          <option value="Sales">Sales</option>
-          <option value="HR">HR</option>
+          <option value="all">All Teams</option>
+          {teams.map((t) => (
+            <option key={t.id} value={t.name}>
+              {t.name}
+            </option>
+          ))}
         </select>
+
+        <button
+          onClick={() => {
+            setEditingJob(null);
+            setJobForm(emptyForm());
+            setShowJobModal(true);
+          }}
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-medium whitespace-nowrap"
+        >
+          <Plus className="w-4 h-4" /> Create Job
+        </button>
       </div>
 
       {/* Alerts */}
@@ -1324,7 +1260,13 @@ const HRJobs = () => {
                               </p>
                             </div>
                             <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-medium border ${interview.result === "Passed" ? "bg-green-100 text-green-700 border-green-200" : interview.result === "Failed" ? "bg-red-100 text-red-700 border-red-200" : "bg-yellow-100 text-yellow-700 border-yellow-200"}`}
+                              className={`px-2 py-0.5 rounded-full text-xs font-medium border ${
+                                interview.result === "Passed"
+                                  ? "bg-green-100 text-green-700 border-green-200"
+                                  : interview.result === "Failed"
+                                    ? "bg-red-100 text-red-700 border-red-200"
+                                    : "bg-yellow-100 text-yellow-700 border-yellow-200"
+                              }`}
                             >
                               {interview.result || "Pending"}
                             </span>
@@ -1428,7 +1370,10 @@ const HRJobs = () => {
                     <select
                       value={jobForm.department}
                       onChange={(e) =>
-                        setJobForm({ ...jobForm, department: e.target.value })
+                        setJobForm({
+                          ...jobForm,
+                          department: e.target.value,
+                        })
                       }
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:border-emerald-500"
                       required
@@ -1467,7 +1412,10 @@ const HRJobs = () => {
                     <select
                       value={jobForm.experience}
                       onChange={(e) =>
-                        setJobForm({ ...jobForm, experience: e.target.value })
+                        setJobForm({
+                          ...jobForm,
+                          experience: e.target.value,
+                        })
                       }
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:border-emerald-500"
                     >
@@ -1555,7 +1503,10 @@ const HRJobs = () => {
                     rows="2"
                     value={jobForm.requirements}
                     onChange={(e) =>
-                      setJobForm({ ...jobForm, requirements: e.target.value })
+                      setJobForm({
+                        ...jobForm,
+                        requirements: e.target.value,
+                      })
                     }
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:border-emerald-500"
                   />
