@@ -22,14 +22,11 @@ import {
   Building,
   Phone,
   FileText,
-  ChevronDown,
   Eye,
   Send,
-  Ban,
   UserCheck,
   Award,
   MessageSquare,
-  BarChart,
   AlertCircle,
   Play,
   Pause,
@@ -61,7 +58,6 @@ const asArray = (val) => {
   if (typeof val === "string") {
     const trimmed = val.trim();
     if (!trimmed) return [];
-    // Try JSON first
     if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
       try {
         const parsed = JSON.parse(trimmed);
@@ -70,14 +66,12 @@ const asArray = (val) => {
         /* fall through */
       }
     }
-    // Try newline-separated
     if (trimmed.includes("\n")) {
       return trimmed
         .split("\n")
         .map((s) => s.trim())
         .filter(Boolean);
     }
-    // Try comma-separated
     if (trimmed.includes(",")) {
       return trimmed
         .split(",")
@@ -208,7 +202,6 @@ const HRJobs = () => {
     }
   }, []);
 
-  // Track in-flight fetches to avoid race conditions
   const fetchSeq = useRef(0);
 
   // ============================================
@@ -234,7 +227,6 @@ const HRJobs = () => {
 
       const res = await api.get(`${APIPATHS.getAllJobs}?${params.toString()}`);
 
-      // Ignore stale response if a newer request has started
       if (seq !== fetchSeq.current) return;
 
       if (res?.success) {
@@ -368,7 +360,6 @@ const HRJobs = () => {
 
       const roundsNum = Math.max(1, parseInt(jobForm.rounds, 10) || 1);
 
-      // Build a hiring_workflow with the requested number of rounds
       const hiring_workflow = Array.from({ length: roundsNum }, (_, i) => ({
         name: `Round ${i + 1}`,
         type: "Interview",

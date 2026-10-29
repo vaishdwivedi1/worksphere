@@ -4,6 +4,53 @@ import pool from "../config/postgres.js";
 const FN = "JobController";
 
 // ============================================
+// Normalize any value into a REAL string array
+// (for Postgres TEXT[] columns)
+// ============================================
+const toTextArray = (v) => {
+  if (v === null || v === undefined) return [];
+  if (Array.isArray(v))
+    return v.map((x) => String(x).trim()).filter((x) => x.length > 0);
+  if (typeof v === "string") {
+    const s = v.trim();
+    if (!s) return [];
+    // JSON array string?
+    if (s.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(s);
+        if (Array.isArray(parsed))
+          return parsed.map((x) => String(x).trim()).filter(Boolean);
+      } catch {
+        /* ignore, fall through */
+      }
+    }
+    // newline or comma separated
+    return s
+      .split(/\r?\n|,/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+  }
+  return [];
+};
+
+// ============================================
+// Normalize hiring_workflow into a real array
+// (for Postgres JSONB column)
+// ============================================
+const toWorkflowArray = (v) => {
+  if (Array.isArray(v)) return v;
+  if (typeof v === "string" && v.trim()) {
+    try {
+      const parsed = JSON.parse(v);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+// ============================================
 // CREATE JOB
 // ============================================
 export const createJob = async (req, res) => {
@@ -41,29 +88,11 @@ export const createJob = async (req, res) => {
       );
     }
 
-    // Normalize array-ish fields (accept arrays or JSON strings)
-    const toArray = (v) => {
-      if (Array.isArray(v)) return v;
-      if (typeof v === "string" && v.trim()) {
-        try {
-          const parsed = JSON.parse(v);
-          return Array.isArray(parsed) ? parsed : [v];
-        } catch {
-          return v
-            .split("\n")
-            .map((s) => s.trim())
-            .filter(Boolean);
-        }
-      }
-      return [];
-    };
+    const reqs = toTextArray(requirements);
+    const skillArr = toTextArray(skills);
+    const sqs = toTextArray(screening_questions);
+    const workflow = toWorkflowArray(hiring_workflow);
 
-    const workflow = toArray(hiring_workflow);
-    const reqs = toArray(requirements);
-    const skillArr = toArray(skills);
-    const sqs = toArray(screening_questions);
-
-    // Prefer explicit total_rounds, else derive from workflow, else 0
     const rounds =
       Number.isFinite(Number(total_rounds)) && Number(total_rounds) > 0
         ? Number(total_rounds)
@@ -91,10 +120,10 @@ export const createJob = async (req, res) => {
         experience_required ?? null,
         location ?? null,
         description ?? null,
-        JSON.stringify(reqs),
-        JSON.stringify(skillArr),
-        JSON.stringify(workflow),
-        JSON.stringify(sqs),
+        reqs, // real array -> TEXT[]
+        skillArr, // real array -> TEXT[]
+        JSON.stringify(workflow), // string -> JSONB
+        sqs, // real array -> TEXT[]
         approval_requested_by ?? null,
         approval_reason ?? null,
         approval_department ?? null,
@@ -256,21 +285,20 @@ export const updateJob = async (req, res) => {
     delete updates.organization_id;
     delete updates.created_at;
 
-    const toJSON = (v) => (Array.isArray(v) ? JSON.stringify(v) : v);
+    // TEXT[] columns — pass real arrays
+    if (updates.requirements !== undefined)
+      updates.requirements = toTextArray(updates.requirements);
+    if (updates.skills !== undefined)
+      updates.skills = toTextArray(updates.skills);
+    if (updates.screening_questions !== undefined)
+      updates.screening_questions = toTextArray(updates.screening_questions);
 
+    // JSONB column — stringify
     if (updates.hiring_workflow !== undefined) {
-      const wf = Array.isArray(updates.hiring_workflow)
-        ? updates.hiring_workflow
-        : [];
+      const wf = toWorkflowArray(updates.hiring_workflow);
       updates.hiring_workflow = JSON.stringify(wf);
       updates.total_rounds = wf.length;
     }
-
-    if (updates.requirements !== undefined)
-      updates.requirements = toJSON(updates.requirements);
-    if (updates.skills !== undefined) updates.skills = toJSON(updates.skills);
-    if (updates.screening_questions !== undefined)
-      updates.screening_questions = toJSON(updates.screening_questions);
 
     const allowedFields = [
       "title",
