@@ -3,9 +3,6 @@ import { handleError, handleSuccess } from "../commonFunctions/commonError.js";
 
 const FN = "CandidateController";
 
-// ============================================
-// CREATE CANDIDATE
-// ============================================
 export const createCandidate = async (req, res) => {
   const fn = `${FN}.createCandidate`;
   try {
@@ -19,6 +16,7 @@ export const createCandidate = async (req, res) => {
       experience,
       notice_period,
       stage,
+      screening_answers, // NEW: { "Question text": "Candidate's answer" }
     } = req.body;
 
     if (!job_id || !organization_id || !name || !email) {
@@ -31,14 +29,13 @@ export const createCandidate = async (req, res) => {
       );
     }
 
-    // Default stage/status
     const finalStage = stage && stage.trim() ? stage : "Applied";
 
     const result = await pool.query(
       `INSERT INTO candidates (
         job_id, organization_id, name, email, phone,
-        resume_url, experience, notice_period, stage, status
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+        resume_url, experience, notice_period, stage, status, screening_answers
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
       RETURNING *`,
       [
         job_id,
@@ -50,11 +47,11 @@ export const createCandidate = async (req, res) => {
         experience || null,
         notice_period || null,
         finalStage,
-        "Applied", // Force initial status
+        "Applied",
+        JSON.stringify(screening_answers || {}),
       ],
     );
 
-    // Increment total_applicants in jobs table
     await pool.query(
       "UPDATE jobs SET total_applicants = total_applicants + 1 WHERE id = $1",
       [job_id],
@@ -81,9 +78,6 @@ export const createCandidate = async (req, res) => {
   }
 };
 
-// ============================================
-// GET CANDIDATES
-// ============================================
 export const getCandidates = async (req, res) => {
   const fn = `${FN}.getCandidates`;
   try {
@@ -137,10 +131,7 @@ export const getCandidates = async (req, res) => {
 
     values.push(limitNum, offset);
     const result = await pool.query(
-      `SELECT * FROM candidates
-       ${where}
-       ORDER BY ${sortCol} ${sortOrder}
-       LIMIT $${idx++} OFFSET $${idx++}`,
+      `SELECT * FROM candidates ${where} ORDER BY ${sortCol} ${sortOrder} LIMIT $${idx++} OFFSET $${idx++}`,
       values,
     );
 
@@ -164,26 +155,19 @@ export const getCandidates = async (req, res) => {
   }
 };
 
-// ============================================
-// GET SINGLE CANDIDATE
-// ============================================
 export const getCandidateById = async (req, res) => {
   const fn = `${FN}.getCandidateById`;
   try {
     const { id } = req.params;
-
     const candidate = await pool.query(
       "SELECT * FROM candidates WHERE id = $1",
       [id],
     );
-    if (candidate.rows.length === 0) {
+    if (candidate.rows.length === 0)
       return handleError(res, 404, "Candidate not found", null, fn);
-    }
 
     const interviews = await pool.query(
-      `SELECT * FROM candidate_interviews
-       WHERE candidate_id = $1
-       ORDER BY created_at ASC`,
+      `SELECT * FROM candidate_interviews WHERE candidate_id = $1 ORDER BY created_at ASC`,
       [id],
     );
 
@@ -202,9 +186,6 @@ export const getCandidateById = async (req, res) => {
   }
 };
 
-// ============================================
-// UPDATE CANDIDATE
-// ============================================
 export const updateCandidate = async (req, res) => {
   const fn = `${FN}.updateCandidate`;
   try {
@@ -220,8 +201,8 @@ export const updateCandidate = async (req, res) => {
       "notice_period",
       "status",
       "stage",
+      "screening_answers",
     ];
-
     const fields = [];
     const values = [];
     let idx = 1;
@@ -229,24 +210,25 @@ export const updateCandidate = async (req, res) => {
     for (const key of allowed) {
       if (updates[key] !== undefined) {
         fields.push(`${key} = $${idx++}`);
-        values.push(updates[key]);
+        values.push(
+          key === "screening_answers"
+            ? JSON.stringify(updates[key])
+            : updates[key],
+        );
       }
     }
 
-    if (!fields.length) {
+    if (!fields.length)
       return handleError(res, 400, "No valid fields to update", null, fn);
-    }
 
     values.push(id);
     const result = await pool.query(
-      `UPDATE candidates SET ${fields.join(", ")}
-       WHERE id = $${idx} RETURNING *`,
+      `UPDATE candidates SET ${fields.join(", ")} WHERE id = $${idx} RETURNING *`,
       values,
     );
 
-    if (!result.rows.length) {
+    if (!result.rows.length)
       return handleError(res, 404, "Candidate not found", null, fn);
-    }
 
     return handleSuccess(
       res,
@@ -260,15 +242,11 @@ export const updateCandidate = async (req, res) => {
   }
 };
 
-// ============================================
-// UPDATE CANDIDATE STATUS
-// ============================================
 export const updateCandidateStatus = async (req, res) => {
   const fn = `${FN}.updateCandidateStatus`;
   try {
     const { id } = req.params;
     const { status } = req.body;
-
     const validStatuses = [
       "Applied",
       "Screening",
@@ -287,16 +265,12 @@ export const updateCandidateStatus = async (req, res) => {
         fn,
       );
     }
-
     const result = await pool.query(
       "UPDATE candidates SET status = $1 WHERE id = $2 RETURNING *",
       [status, id],
     );
-
-    if (!result.rows.length) {
+    if (!result.rows.length)
       return handleError(res, 404, "Candidate not found", null, fn);
-    }
-
     return handleSuccess(
       res,
       200,
@@ -309,27 +283,20 @@ export const updateCandidateStatus = async (req, res) => {
   }
 };
 
-// ============================================
-// DELETE CANDIDATE
-// ============================================
 export const deleteCandidate = async (req, res) => {
   const fn = `${FN}.deleteCandidate`;
   try {
     const { id } = req.params;
-
     const cand = await pool.query(
       "SELECT job_id FROM candidates WHERE id = $1",
       [id],
     );
-    if (!cand.rows.length) {
+    if (!cand.rows.length)
       return handleError(res, 404, "Candidate not found", null, fn);
-    }
 
     await pool.query("DELETE FROM candidates WHERE id = $1", [id]);
     await pool.query(
-      `UPDATE jobs
-       SET total_applicants = GREATEST(total_applicants - 1, 0)
-       WHERE id = $1`,
+      `UPDATE jobs SET total_applicants = GREATEST(total_applicants - 1, 0) WHERE id = $1`,
       [cand.rows[0].job_id],
     );
 

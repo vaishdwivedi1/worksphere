@@ -25,7 +25,6 @@ import {
   Send,
   UserCheck,
   Award,
-  MessageSquare,
   AlertCircle,
   Play,
   Pause,
@@ -37,6 +36,7 @@ import {
   PlusCircle,
   MinusCircle,
 } from "lucide-react";
+import { toast } from "react-toastify";
 import { api } from "../services/api";
 import APIPATHS from "../utils/APIPATHS";
 
@@ -56,56 +56,61 @@ const asArray = (val) => {
   if (typeof val === "string") {
     const trimmed = val.trim();
     if (!trimmed) return [];
-    if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        return Array.isArray(parsed) ? parsed : [trimmed];
-      } catch {}
-    }
-    if (trimmed.includes("\n")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      return Array.isArray(parsed) ? parsed : [parsed];
+    } catch {
       return trimmed
-        .split("\n")
+        .split(/\n|,/)
         .map((s) => s.trim())
         .filter(Boolean);
     }
-    if (trimmed.includes(",")) {
-      return trimmed
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-    }
-    return [trimmed];
   }
   return [];
 };
 
-const mapJobFromApi = (j) => ({
-  id: j.id,
-  title: j.title || "",
-  department: j.department || "—",
-  team: j.team || "—",
-  location: j.location || "—",
-  employmentType: j.employment_type || "—",
-  experience: j.experience_required || "—",
-  status: j.status || "Draft",
-  applicants: Number(j.total_applicants) || 0,
-  createdAt: j.created_at ? new Date(j.created_at).toLocaleDateString() : "—",
-  rounds: Number(j.total_rounds) || 0,
-  description: j.description || "",
-  responsibilities: j.responsibilities || "",
-  requirements: asArray(j.requirements),
-  skills: asArray(j.skills),
-  hiringWorkflow: asArray(j.hiring_workflow),
-  screeningQuestions: asArray(j.screening_questions),
-  approval: {
-    requestedBy: j.approval_requested_by || "—",
-    reason: j.approval_reason || "—",
-    department: j.approval_department || "—",
-    team: j.approval_team || "—",
-  },
-  candidates: [],
-  _raw: j,
-});
+// ============================================
+// MAPPERS
+// ============================================
+const mapJobFromApi = (j) => {
+  let normalizedScreening = [];
+  if (Array.isArray(j.screening_questions)) {
+    normalizedScreening = j.screening_questions.map((item) => {
+      if (typeof item === "string") return { question: item, answer: "" };
+      if (item && typeof item === "object")
+        return { question: item.question || "", answer: item.answer || "" };
+      return { question: "", answer: "" };
+    });
+  }
+
+  return {
+    id: j.id,
+    title: j.title || "",
+    department: j.department || "—",
+    team: j.team || "—",
+    location: j.location || "—",
+    employmentType: j.employment_type || "—",
+    experience: j.experience_required || "—",
+    status: j.status || "Draft",
+    applicants: Number(j.total_applicants) || 0,
+    createdAt: j.created_at ? new Date(j.created_at).toLocaleDateString() : "—",
+    rounds: Number(j.total_rounds) || 0,
+    description: j.description || "",
+    responsibilities: j.responsibilities || "",
+    requirements: asArray(j.requirements),
+    skills: asArray(j.skills),
+    hiringWorkflow: asArray(j.hiring_workflow),
+    screeningQuestions: normalizedScreening,
+    approval: {
+      requestedBy: j.approval_requested_by || "—",
+      reason: j.approval_reason || "—",
+      department: j.approval_department || "—",
+      team: j.approval_team || "—",
+    },
+    candidates: [],
+    _raw: j,
+  };
+};
 
 const mapCandidateFromApi = (c) => ({
   id: c.id,
@@ -117,6 +122,7 @@ const mapCandidateFromApi = (c) => ({
   experience: c.experience || "—",
   stage: c.stage || c.status || "Applied",
   noticePeriod: c.notice_period || "—",
+  screeningAnswers: c.screening_answers || {},
   interviewHistory: asArray(c.interviews).map((i) => ({
     id: i.id,
     round: i.round_name || i.round || "—",
@@ -144,7 +150,7 @@ const useDebounced = (value, delay = 400) => {
 const emptyForm = () => ({
   title: "",
   department: "",
-  team: "", // Will store team name/id
+  team: "",
   experience: "",
   employmentType: "full-time",
   location: "remote",
@@ -153,9 +159,12 @@ const emptyForm = () => ({
   requirements: "",
   skills: "",
   rounds: 3,
-  screeningQuestions: [""],
+  screeningQuestions: [{ question: "", answer: "" }],
 });
 
+// ============================================
+// MAIN COMPONENT
+// ============================================
 const HRJobs = () => {
   const [selectedJob, setSelectedJob] = useState(null);
   const [showJobModal, setShowJobModal] = useState(false);
@@ -163,11 +172,19 @@ const HRJobs = () => {
   const [showAddCandidateModal, setShowAddCandidateModal] = useState(false);
   const [showInterviewModal, setShowInterviewModal] = useState(false);
 
+  // Custom confirm modal state
+  const [confirmState, setConfirmState] = useState({
+    open: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+  });
+
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [editingJob, setEditingJob] = useState(null);
 
   const [jobs, setJobs] = useState([]);
-  const [teams, setTeams] = useState([]); // TEAMS STATE
+  const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -186,6 +203,7 @@ const HRJobs = () => {
     experience: "",
     notice_period: "",
     resume_url: "",
+    screeningAnswers: {},
   });
 
   const [interviewForm, setInterviewForm] = useState({
@@ -211,14 +229,34 @@ const HRJobs = () => {
   const fetchSeq = useRef(0);
 
   // ============================================
+  // CONFIRM HELPER (Toast-style custom modal)
+  // ============================================
+  const confirmAction = (title, message) =>
+    new Promise((resolve) => {
+      setConfirmState({
+        open: true,
+        title,
+        message,
+        onConfirm: (ok) => {
+          setConfirmState({
+            open: false,
+            title: "",
+            message: "",
+            onConfirm: null,
+          });
+          resolve(ok);
+        },
+      });
+    });
+
+  // ============================================
   // API CALLS
   // ============================================
   const fetchJobsApi = useCallback(async () => {
     if (!organizationId) {
-      setError("Organization not found. Please log in again.");
+      setError("Organization not found.");
       return;
     }
-
     const seq = ++fetchSeq.current;
     setLoading(true);
     setError("");
@@ -232,36 +270,36 @@ const HRJobs = () => {
         params.append("search", debouncedSearch.trim());
 
       const res = await api.get(`${APIPATHS.getAllJobs}?${params.toString()}`);
-
       if (seq !== fetchSeq.current) return;
 
       if (res?.success) {
         const list = res.data?.jobs || res.data || [];
         setJobs(asArray(list).map(mapJobFromApi));
       } else {
-        setError(res?.message || "Failed to load jobs");
+        const msg = res?.message || "Failed to load jobs";
+        setError(msg);
+        toast.error(msg);
       }
     } catch (err) {
       if (seq !== fetchSeq.current) return;
-      setError(err?.message || "Failed to load jobs");
+      const msg = err?.message || "Failed to load jobs";
+      setError(msg);
+      toast.error(msg);
     } finally {
       if (seq === fetchSeq.current) setLoading(false);
     }
   }, [organizationId, statusFilter, deptFilter, debouncedSearch]);
 
-  // Fetch Teams API
   const fetchTeams = useCallback(async () => {
     if (!organizationId) return;
     try {
       const response = await api.get(
         `${APIPATHS.getAllTeams}/${organizationId}`,
       );
-      // Handle API response shape (assuming response.data is an array)
       const teamsList = response.data || response || [];
       setTeams(Array.isArray(teamsList) ? teamsList : []);
     } catch (err) {
       console.error("fetchTeams error:", err);
-      // Do not block job fetch if teams fail
     }
   }, [organizationId]);
 
@@ -272,7 +310,9 @@ const HRJobs = () => {
 
   const fetchCandidatesByJobApi = async (jobId) => {
     try {
-      const url = `${APIPATHS.getAllCandidates}?job_id=${encodeURIComponent(jobId)}`;
+      const url = `${APIPATHS.getAllCandidates}?job_id=${encodeURIComponent(
+        jobId,
+      )}`;
       const res = await api.get(url);
       if (res?.success) {
         const list = res.data?.candidates || res.data || [];
@@ -326,39 +366,59 @@ const HRJobs = () => {
       skills: (job.skills || []).join(", "),
       rounds: job.rounds || 1,
       screeningQuestions:
-        job.screeningQuestions.length > 0 ? job.screeningQuestions : [""],
+        job.screeningQuestions.length > 0
+          ? job.screeningQuestions.map((q) => ({
+              question: q.question || "",
+              answer: q.answer || "",
+            }))
+          : [{ question: "", answer: "" }],
     });
     setShowJobModal(true);
   };
 
   const handleArchive = async (job) => {
-    if (!window.confirm(`Archive "${job.title}"?`)) return;
+    const ok = await confirmAction(
+      "Archive Job",
+      `Archive "${job.title}"? This will move it to On Hold.`,
+    );
+    if (!ok) return;
     try {
       const res = await updateJobStatusApi(job.id, "On Hold");
-      if (res?.success) fetchJobsApi();
-      else alert(res?.message || "Failed to archive");
+      if (res?.success) {
+        toast.success("Job archived successfully");
+        fetchJobsApi();
+      } else {
+        toast.error(res?.message || "Failed to archive");
+      }
     } catch (err) {
-      alert(err?.message || "Failed to archive");
+      toast.error(err?.message || "Failed to archive");
     }
   };
 
   const handleDelete = async (job) => {
-    if (!window.confirm(`Delete "${job.title}"? This cannot be undone.`))
-      return;
+    const ok = await confirmAction(
+      "Delete Job",
+      `Delete "${job.title}"? This action cannot be undone.`,
+    );
+    if (!ok) return;
     try {
       const res = await deleteJobApi(job.id);
-      if (res?.success) fetchJobsApi();
-      else alert(res?.message || "Failed to delete");
+      if (res?.success) {
+        toast.success("Job deleted successfully");
+        fetchJobsApi();
+      } else {
+        toast.error(res?.message || "Failed to delete");
+      }
     } catch (err) {
-      alert(err?.message || "Failed to delete");
+      toast.error(err?.message || "Failed to delete");
     }
   };
 
   const handleSubmitJob = async (e) => {
     e.preventDefault();
-    if (!organizationId) return alert("Organization not found.");
+    if (!organizationId) return toast.error("Organization not found.");
     if (!jobForm.title.trim() || !jobForm.department)
-      return alert("Title and Department required");
+      return toast.error("Title and Department are required");
 
     setSubmitting(true);
     try {
@@ -371,9 +431,12 @@ const HRJobs = () => {
         .map((s) => s.trim())
         .filter(Boolean);
 
-      const screening_questions = jobForm.screeningQuestions.filter(
-        (q) => q.trim() !== "",
-      );
+      const screening_questions = jobForm.screeningQuestions
+        .filter((q) => q.question.trim() !== "")
+        .map((q) => ({
+          question: q.question.trim(),
+          answer: (q.answer || "").trim(),
+        }));
 
       const roundsNum = Math.max(1, parseInt(jobForm.rounds, 10) || 1);
 
@@ -388,7 +451,7 @@ const HRJobs = () => {
         organization_id: organizationId,
         title: jobForm.title.trim(),
         department: jobForm.department,
-        team: jobForm.team || null, // TEAM ID/NAME
+        team: jobForm.team || null,
         experience_required: jobForm.experience || null,
         employment_type:
           jobForm.employmentType.charAt(0).toUpperCase() +
@@ -410,15 +473,18 @@ const HRJobs = () => {
         : await createJobApi(payload);
 
       if (res?.success) {
+        toast.success(
+          editingJob ? "Job updated successfully" : "Job created successfully",
+        );
         setShowJobModal(false);
         setEditingJob(null);
         setJobForm(emptyForm());
         fetchJobsApi();
       } else {
-        alert(res?.message || "Failed to save job");
+        toast.error(res?.message || "Failed to save job");
       }
     } catch (err) {
-      alert(err?.message || "Failed to save job");
+      toast.error(err?.message || "Failed to save job");
     } finally {
       setSubmitting(false);
     }
@@ -438,6 +504,12 @@ const HRJobs = () => {
   };
 
   const handleOpenAddCandidate = () => {
+    const initialAnswers = {};
+    if (selectedJob?.screeningQuestions) {
+      selectedJob.screeningQuestions.forEach((q) => {
+        initialAnswers[q.question] = "";
+      });
+    }
     setCandidateForm({
       name: "",
       email: "",
@@ -445,6 +517,7 @@ const HRJobs = () => {
       experience: "",
       notice_period: "",
       resume_url: "",
+      screeningAnswers: initialAnswers,
     });
     setShowAddCandidateModal(true);
   };
@@ -461,25 +534,31 @@ const HRJobs = () => {
       };
       const res = await createCandidateApi(payload);
       if (res?.success) {
+        toast.success("Candidate added successfully");
         setShowAddCandidateModal(false);
         const candidates = await fetchCandidatesByJobApi(selectedJob.id);
         setSelectedJob((prev) => (prev ? { ...prev, candidates } : prev));
         fetchJobsApi();
       } else {
-        alert(res?.message || "Failed to add candidate");
+        toast.error(res?.message || "Failed to add candidate");
       }
     } catch (err) {
-      alert(err?.message || "Failed to add candidate");
+      toast.error(err?.message || "Failed to add candidate");
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleRejectCandidate = async (candidate) => {
-    if (!window.confirm(`Reject ${candidate.name}?`)) return;
+    const ok = await confirmAction(
+      "Reject Candidate",
+      `Reject ${candidate.name}? This will mark them as Rejected.`,
+    );
+    if (!ok) return;
     try {
       const res = await updateCandidateStatusApi(candidate.id, "Rejected");
       if (res?.success) {
+        toast.success("Candidate rejected");
         setShowCandidateModal(false);
         setSelectedCandidate(null);
         if (selectedJob) {
@@ -488,14 +567,14 @@ const HRJobs = () => {
         }
         fetchJobsApi();
       } else {
-        alert(res?.message || "Failed to reject");
+        toast.error(res?.message || "Failed to reject");
       }
     } catch (err) {
-      alert(err?.message || "Failed to reject");
+      toast.error(err?.message || "Failed to reject");
     }
   };
 
-  const handleScheduleInterview = (candidate) => {
+  const handleScheduleInterview = () => {
     setInterviewForm({
       round_name: "",
       interviewer: "",
@@ -520,6 +599,7 @@ const HRJobs = () => {
       };
       const res = await createInterviewApi(payload);
       if (res?.success) {
+        toast.success("Interview scheduled successfully");
         setShowInterviewModal(false);
         const updatedCand = await getCandidateByIdApi(selectedCandidate.id);
         if (updatedCand?.success) {
@@ -527,34 +607,50 @@ const HRJobs = () => {
         }
         fetchJobsApi();
       } else {
-        alert(res?.message || "Failed to add interview");
+        toast.error(res?.message || "Failed to add interview");
       }
     } catch (err) {
-      alert(err?.message || "Failed to add interview");
+      toast.error(err?.message || "Failed to add interview");
     } finally {
       setSubmitting(false);
     }
   };
 
+  // Screening question handlers
   const handleAddQuestion = () => {
     setJobForm({
       ...jobForm,
-      screeningQuestions: [...jobForm.screeningQuestions, ""],
+      screeningQuestions: [
+        ...jobForm.screeningQuestions,
+        { question: "", answer: "" },
+      ],
+    });
+  };
+  const handleUpdateQuestion = (index, field, value) => {
+    const updated = [...jobForm.screeningQuestions];
+    updated[index] = { ...updated[index], [field]: value };
+    setJobForm({ ...jobForm, screeningQuestions: updated });
+  };
+  const handleRemoveQuestion = (index) => {
+    if (jobForm.screeningQuestions.length === 1) return;
+    setJobForm({
+      ...jobForm,
+      screeningQuestions: jobForm.screeningQuestions.filter(
+        (_, i) => i !== index,
+      ),
     });
   };
 
-  const handleUpdateQuestion = (index, value) => {
-    const newQs = [...jobForm.screeningQuestions];
-    newQs[index] = value;
-    setJobForm({ ...jobForm, screeningQuestions: newQs });
+  const handleUpdateCandidateAnswer = (question, value) => {
+    setCandidateForm((prev) => ({
+      ...prev,
+      screeningAnswers: { ...prev.screeningAnswers, [question]: value },
+    }));
   };
 
-  const handleRemoveQuestion = (index) => {
-    if (jobForm.screeningQuestions.length === 1) return;
-    const newQs = jobForm.screeningQuestions.filter((_, i) => i !== index);
-    setJobForm({ ...jobForm, screeningQuestions: newQs });
-  };
-
+  // ============================================
+  // STYLING
+  // ============================================
   const statusColors = {
     Open: "bg-green-100 text-green-700 border-green-200",
     Draft: "bg-gray-100 text-gray-700 border-gray-200",
@@ -562,7 +658,6 @@ const HRJobs = () => {
     "On Hold": "bg-yellow-100 text-yellow-700 border-yellow-200",
     Filled: "bg-blue-100 text-blue-700 border-blue-200",
   };
-
   const candidateStatusColors = {
     Applied: "bg-blue-100 text-blue-700 border-blue-200",
     Screening: "bg-yellow-100 text-yellow-700 border-yellow-200",
@@ -611,9 +706,47 @@ const HRJobs = () => {
     }
   };
 
+  // ============================================
+  // RENDER
+  // ============================================
   return (
     <div className="w-full overflow-scroll h-[80dvh]">
-      {/* Header, Stats, Search etc. */}
+      {/* Custom Confirm Modal */}
+      {confirmState.open && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <AlertCircle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-800">
+                  {confirmState.title}
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  {confirmState.message}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => confirmState.onConfirm?.(false)}
+                className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => confirmState.onConfirm?.(true)}
+                className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-all"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stats & Header */}
       <div className="flex justify-between items-center w-full gap-4 mb-6">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 flex-1">
           {[
@@ -732,6 +865,7 @@ const HRJobs = () => {
         </select>
       </div>
 
+      {/* Alerts */}
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm flex items-center gap-2">
           <AlertCircle className="w-4 h-4" />
@@ -839,7 +973,7 @@ const HRJobs = () => {
         </div>
       )}
 
-      {/* Job Details Modal */}
+      {/* Job Detail Modal */}
       {selectedJob && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -967,21 +1101,20 @@ const HRJobs = () => {
               {selectedJob.screeningQuestions.length > 0 && (
                 <div>
                   <h4 className="text-sm font-semibold text-gray-700 mb-2">
-                    Screening Questions
+                    Screening Questions & Expected Answers
                   </h4>
-                  <ul className="space-y-1">
+                  <div className="space-y-2">
                     {selectedJob.screeningQuestions.map((q, idx) => (
-                      <li
-                        key={idx}
-                        className="text-sm text-gray-600 flex items-start gap-2"
-                      >
-                        <span className="text-emerald-600 font-bold">
-                          Q{idx + 1}.
-                        </span>
-                        {typeof q === "string" ? q : JSON.stringify(q)}
-                      </li>
+                      <div key={idx} className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-sm font-medium text-gray-800">
+                          Q{idx + 1}. {q.question}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1 italic">
+                          Expected: {q.answer || "—"}
+                        </p>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </div>
               )}
 
@@ -1140,6 +1273,35 @@ const HRJobs = () => {
                 ))}
               </div>
 
+              {selectedJob?.screeningQuestions &&
+                selectedJob.screeningQuestions.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                      Screening Questions & Answers
+                    </h4>
+                    <div className="space-y-3">
+                      {selectedJob.screeningQuestions.map((q, idx) => (
+                        <div
+                          key={idx}
+                          className="bg-white border border-gray-200 rounded-lg p-3"
+                        >
+                          <p className="text-sm text-gray-800 font-medium">
+                            Q{idx + 1}. {q.question}
+                          </p>
+                          <p className="text-xs text-gray-500 italic mt-1">
+                            Expected: {q.answer || "—"}
+                          </p>
+                          <p className="text-sm text-emerald-700 font-medium mt-2">
+                            Candidate:{" "}
+                            {selectedCandidate.screeningAnswers?.[q.question] ||
+                              "Not answered"}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
               <div>
                 <h4 className="text-sm font-semibold text-gray-700 mb-3">
                   Interview History
@@ -1207,7 +1369,7 @@ const HRJobs = () => {
 
               <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-200">
                 <button
-                  onClick={() => handleScheduleInterview(selectedCandidate)}
+                  onClick={() => handleScheduleInterview()}
                   className="flex-1 min-w-[120px] flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-medium"
                 >
                   <UserCheck className="w-4 h-4" /> Schedule Interview
@@ -1279,7 +1441,6 @@ const HRJobs = () => {
                       <option value="HR">HR</option>
                     </select>
                   </div>
-                  {/* TEAMS DROPDOWN */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
                       Team
@@ -1367,9 +1528,8 @@ const HRJobs = () => {
                     }
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:border-emerald-500"
                     placeholder="Short description..."
-                  ></textarea>
+                  />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Responsibilities
@@ -1385,9 +1545,8 @@ const HRJobs = () => {
                     }
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:border-emerald-500"
                     placeholder="Key responsibilities..."
-                  ></textarea>
+                  />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Requirements (one per line)
@@ -1399,9 +1558,8 @@ const HRJobs = () => {
                       setJobForm({ ...jobForm, requirements: e.target.value })
                     }
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:border-emerald-500"
-                  ></textarea>
+                  />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Skills (comma separated)
@@ -1415,7 +1573,6 @@ const HRJobs = () => {
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:border-emerald-500"
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Number of Interview Rounds
@@ -1432,11 +1589,10 @@ const HRJobs = () => {
                   />
                 </div>
 
-                {/* SCREENING QUESTIONS DYNAMIC UI */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="block text-sm font-medium text-gray-700">
-                      Screening Questions
+                      Screening Questions & Expected Answers
                     </label>
                     <button
                       type="button"
@@ -1446,29 +1602,53 @@ const HRJobs = () => {
                       <PlusCircle className="w-3.5 h-3.5" /> Add Question
                     </button>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {jobForm.screeningQuestions.map((q, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-gray-400 w-4">
-                          Q{idx + 1}
-                        </span>
-                        <input
-                          type="text"
-                          value={q}
-                          onChange={(e) =>
-                            handleUpdateQuestion(idx, e.target.value)
-                          }
-                          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:border-emerald-500"
-                          placeholder="e.g., Are you comfortable with on-call rotations?"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveQuestion(idx)}
-                          disabled={jobForm.screeningQuestions.length === 1}
-                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <MinusCircle className="w-4 h-4" />
-                        </button>
+                      <div
+                        key={idx}
+                        className="bg-gray-50 rounded-lg p-3 border border-gray-100"
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xs font-bold text-gray-400 w-4">
+                            Q{idx + 1}
+                          </span>
+                          <input
+                            type="text"
+                            value={q.question}
+                            onChange={(e) =>
+                              handleUpdateQuestion(
+                                idx,
+                                "question",
+                                e.target.value,
+                              )
+                            }
+                            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-black bg-white focus:border-emerald-500"
+                            placeholder="Enter question..."
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveQuestion(idx)}
+                            disabled={jobForm.screeningQuestions.length === 1}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-50"
+                          >
+                            <MinusCircle className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <div className="pl-6">
+                          <input
+                            type="text"
+                            value={q.answer}
+                            onChange={(e) =>
+                              handleUpdateQuestion(
+                                idx,
+                                "answer",
+                                e.target.value,
+                              )
+                            }
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black bg-white focus:border-emerald-500"
+                            placeholder="Expected answer / criteria..."
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1622,6 +1802,42 @@ const HRJobs = () => {
                     placeholder="https://..."
                   />
                 </div>
+
+                {selectedJob?.screeningQuestions &&
+                  selectedJob.screeningQuestions.length > 0 && (
+                    <div className="pt-4 border-t border-gray-100">
+                      <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                        Screening Answers
+                      </h4>
+                      <div className="space-y-3">
+                        {selectedJob.screeningQuestions.map((q, idx) => (
+                          <div key={idx} className="bg-gray-50 rounded-lg p-3">
+                            <p className="text-sm font-medium text-gray-800 mb-1">
+                              {idx + 1}. {q.question}
+                            </p>
+                            <p className="text-xs text-gray-500 italic mb-2">
+                              Expected: {q.answer || "—"}
+                            </p>
+                            <textarea
+                              rows="2"
+                              value={
+                                candidateForm.screeningAnswers[q.question] || ""
+                              }
+                              onChange={(e) =>
+                                handleUpdateCandidateAnswer(
+                                  q.question,
+                                  e.target.value,
+                                )
+                              }
+                              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white"
+                              placeholder="Candidate's answer..."
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                 <div className="flex gap-3 pt-4 border-t">
                   <button
                     type="submit"

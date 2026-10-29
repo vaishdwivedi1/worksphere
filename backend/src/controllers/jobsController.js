@@ -3,10 +3,6 @@ import pool from "../config/postgres.js";
 
 const FN = "JobController";
 
-// ============================================
-// Normalize any value into a REAL string array
-// (for Postgres TEXT[] columns)
-// ============================================
 const toTextArray = (v) => {
   if (v === null || v === undefined) return [];
   if (Array.isArray(v)) {
@@ -21,9 +17,7 @@ const toTextArray = (v) => {
         if (Array.isArray(parsed)) {
           return parsed.map((x) => String(x).trim()).filter(Boolean);
         }
-      } catch {
-        /* ignore, fall through */
-      }
+      } catch {}
     }
     return s
       .split(/\r?\n|,/)
@@ -46,9 +40,23 @@ const toWorkflowArray = (v) => {
   return [];
 };
 
-// ============================================
-// CREATE JOB
-// ============================================
+// NEW: Screening questions array of { question, answer }
+const toScreeningArray = (v) => {
+  if (Array.isArray(v))
+    return v.filter((x) => x && (x.question || "").trim() !== "");
+  if (typeof v === "string" && v.trim()) {
+    try {
+      const parsed = JSON.parse(v);
+      return Array.isArray(parsed)
+        ? parsed.filter((x) => x && (x.question || "").trim() !== "")
+        : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
 export const createJob = async (req, res) => {
   const fn = `${FN}.createJob`;
   try {
@@ -87,8 +95,8 @@ export const createJob = async (req, res) => {
 
     const reqs = toTextArray(requirements);
     const skillArr = toTextArray(skills);
-    const sqs = toTextArray(screening_questions); // Filters empty strings
     const workflow = toWorkflowArray(hiring_workflow);
+    const sqs = toScreeningArray(screening_questions);
 
     const rounds =
       Number.isFinite(Number(total_rounds)) && Number(total_rounds) > 0
@@ -121,7 +129,7 @@ export const createJob = async (req, res) => {
         reqs,
         skillArr,
         JSON.stringify(workflow),
-        sqs,
+        JSON.stringify(sqs), // JSONB
         approval_requested_by ?? null,
         approval_reason ?? null,
         approval_department ?? null,
@@ -143,9 +151,6 @@ export const createJob = async (req, res) => {
   }
 };
 
-// ============================================
-// GET JOBS
-// ============================================
 export const getJobs = async (req, res) => {
   const fn = `${FN}.getJobs`;
   try {
@@ -199,10 +204,7 @@ export const getJobs = async (req, res) => {
 
     values.push(limitNum, offset);
     const result = await pool.query(
-      `SELECT * FROM jobs
-       ${where}
-       ORDER BY ${sortCol} ${sortOrder}
-       LIMIT $${idx++} OFFSET $${idx++}`,
+      `SELECT * FROM jobs ${where} ORDER BY ${sortCol} ${sortOrder} LIMIT $${idx++} OFFSET $${idx++}`,
       values,
     );
 
@@ -226,28 +228,20 @@ export const getJobs = async (req, res) => {
   }
 };
 
-// ============================================
-// GET JOB BY ID
-// ============================================
 export const getJobById = async (req, res) => {
   const fn = `${FN}.getJobById`;
   try {
     const { id } = req.params;
-
     const jobResult = await pool.query("SELECT * FROM jobs WHERE id = $1", [
       id,
     ]);
-    if (jobResult.rows.length === 0) {
+    if (jobResult.rows.length === 0)
       return handleError(res, 404, "Job not found", null, fn);
-    }
 
     let statsResult = { rows: [] };
     try {
       statsResult = await pool.query(
-        `SELECT status, COUNT(*)::int AS count
-         FROM candidates
-         WHERE job_id = $1
-         GROUP BY status`,
+        `SELECT status, COUNT(*)::int AS count FROM candidates WHERE job_id = $1 GROUP BY status`,
         [id],
       );
     } catch {}
@@ -267,9 +261,6 @@ export const getJobById = async (req, res) => {
   }
 };
 
-// ============================================
-// UPDATE JOB
-// ============================================
 export const updateJob = async (req, res) => {
   const fn = `${FN}.updateJob`;
   try {
@@ -285,7 +276,9 @@ export const updateJob = async (req, res) => {
     if (updates.skills !== undefined)
       updates.skills = toTextArray(updates.skills);
     if (updates.screening_questions !== undefined)
-      updates.screening_questions = toTextArray(updates.screening_questions);
+      updates.screening_questions = JSON.stringify(
+        toScreeningArray(updates.screening_questions),
+      );
 
     if (updates.hiring_workflow !== undefined) {
       const wf = toWorkflowArray(updates.hiring_workflow);
@@ -325,20 +318,17 @@ export const updateJob = async (req, res) => {
       }
     }
 
-    if (fields.length === 0) {
+    if (fields.length === 0)
       return handleError(res, 400, "No valid fields to update", null, fn);
-    }
 
     values.push(id);
-
     const result = await pool.query(
       `UPDATE jobs SET ${fields.join(", ")} WHERE id = $${idx} RETURNING *`,
       values,
     );
 
-    if (result.rows.length === 0) {
+    if (result.rows.length === 0)
       return handleError(res, 404, "Job not found", null, fn);
-    }
 
     return handleSuccess(
       res,
@@ -352,15 +342,11 @@ export const updateJob = async (req, res) => {
   }
 };
 
-// ============================================
-// UPDATE JOB STATUS
-// ============================================
 export const updateJobStatus = async (req, res) => {
   const fn = `${FN}.updateJobStatus`;
   try {
     const { id } = req.params;
     const { status } = req.body;
-
     const validStatuses = ["Draft", "Open", "Closed", "On Hold", "Filled"];
     if (!validStatuses.includes(status)) {
       return handleError(
@@ -371,16 +357,12 @@ export const updateJobStatus = async (req, res) => {
         fn,
       );
     }
-
     const result = await pool.query(
       "UPDATE jobs SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *",
       [status, id],
     );
-
-    if (result.rows.length === 0) {
+    if (result.rows.length === 0)
       return handleError(res, 404, "Job not found", null, fn);
-    }
-
     return handleSuccess(
       res,
       200,
@@ -393,9 +375,6 @@ export const updateJobStatus = async (req, res) => {
   }
 };
 
-// ============================================
-// DELETE JOB
-// ============================================
 export const deleteJob = async (req, res) => {
   const fn = `${FN}.deleteJob`;
   try {
@@ -404,11 +383,8 @@ export const deleteJob = async (req, res) => {
       "DELETE FROM jobs WHERE id = $1 RETURNING id",
       [id],
     );
-
-    if (result.rows.length === 0) {
+    if (result.rows.length === 0)
       return handleError(res, 404, "Job not found", null, fn);
-    }
-
     return handleSuccess(
       res,
       200,

@@ -35,32 +35,33 @@ const APIPATHS = {
   removeTeamMember: "/worksphere/api/v1/organization/team/members/remove",
 
   // ============================================
-  // JOBS (NEW)
+  // JOBS
   // ============================================
   createJob: "/worksphere/api/v1/jobs/create",
   getAllJobs: "/worksphere/api/v1/jobs",
-  getJobById: "/worksphere/api/v1/jobs", // append /:id
-  updateJob: "/worksphere/api/v1/jobs/update", // append /:id
-  updateJobStatus: "/worksphere/api/v1/jobs/update-status", // append /:id
-  deleteJob: "/worksphere/api/v1/jobs/delete", // append /:id
+  getJobById: "/worksphere/api/v1/jobs/:id",
+  updateJob: "/worksphere/api/v1/jobs/update/:id",
+  updateJobStatus: "/worksphere/api/v1/jobs/update-status/:id",
+  deleteJob: "/worksphere/api/v1/jobs/delete/:id",
 
   // ============================================
-  // CANDIDATES (NEW)
+  // CANDIDATES
   // ============================================
   createCandidate: "/worksphere/api/v1/candidates/create",
   getAllCandidates: "/worksphere/api/v1/candidates",
-  getCandidateById: "/worksphere/api/v1/candidates", // append /:id
-  updateCandidate: "/worksphere/api/v1/candidates/update", // append /:id
-  updateCandidateStatus: "/worksphere/api/v1/candidates/update-status", // append /:id
-  deleteCandidate: "/worksphere/api/v1/candidates/delete", // append /:id
+  getCandidateById: "/worksphere/api/v1/candidates/:id",
+  updateCandidate: "/worksphere/api/v1/candidates/update/:id",
+  updateCandidateStatus: "/worksphere/api/v1/candidates/update-status/:id",
+  deleteCandidate: "/worksphere/api/v1/candidates/delete/:id",
 
   // ============================================
-  // INTERVIEWS (NEW)
+  // INTERVIEWS
   // ============================================
   createInterview: "/worksphere/api/v1/interviews/create",
-  getInterviewsByCandidate: "/worksphere/api/v1/interviews/candidate", // append /:candidateId
-  updateInterview: "/worksphere/api/v1/interviews/update", // append /:id
-  deleteInterview: "/worksphere/api/v1/interviews/delete", // append /:id
+  getInterviewsByCandidate:
+    "/worksphere/api/v1/interviews/candidate/:candidateId",
+  updateInterview: "/worksphere/api/v1/interviews/update/:id",
+  deleteInterview: "/worksphere/api/v1/interviews/delete/:id",
 };
 
 export default APIPATHS;

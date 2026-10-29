@@ -4,7 +4,7 @@ export const createTables = async () => {
   try {
     await pool.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm;`);
 
-    // 1. organizations, users, organization_members (unchanged)
+    // 1. organizations
     await pool.query(`
       CREATE TABLE IF NOT EXISTS organizations (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -21,6 +21,7 @@ export const createTables = async () => {
       );
     `);
 
+    // 2. users
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -35,6 +36,7 @@ export const createTables = async () => {
       );
     `);
 
+    // 3. organization_members
     await pool.query(`
       CREATE TABLE IF NOT EXISTS organization_members (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -53,7 +55,7 @@ export const createTables = async () => {
       );
     `);
 
-    // 4. jobs (ADDED responsibilities)
+    // 4. jobs (screening_questions is now JSONB)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS jobs (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -66,11 +68,11 @@ export const createTables = async () => {
         experience_required VARCHAR(100),
         location VARCHAR(255),
         description TEXT,
-        responsibilities TEXT, -- NEW
+        responsibilities TEXT,
         requirements TEXT[],
         skills TEXT[],
         hiring_workflow JSONB DEFAULT '[]'::jsonb,
-        screening_questions TEXT[],
+        screening_questions JSONB DEFAULT '[]'::jsonb,
         approval_requested_by VARCHAR(255),
         approval_reason TEXT,
         approval_department VARCHAR(100),
@@ -85,7 +87,7 @@ export const createTables = async () => {
       );
     `);
 
-    // ✅ SAFETY FIX: Add column if it doesn't exist in old DB
+    // ✅ SAFETY: Add responsibilities if missing
     await pool.query(`
       DO $$ 
       BEGIN 
@@ -95,7 +97,27 @@ export const createTables = async () => {
       END $$;
     `);
 
-    // Indexes & Triggers for Jobs (unchanged)
+    // ✅ SAFETY: Convert TEXT[] screening_questions to JSONB (from old schema)
+    await pool.query(`
+      DO $$ 
+      BEGIN 
+        IF EXISTS (
+          SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
+          WHERE TABLE_NAME = 'jobs' 
+            AND COLUMN_NAME = 'screening_questions' 
+            AND DATA_TYPE = 'ARRAY'
+        ) THEN 
+          ALTER TABLE jobs ALTER COLUMN screening_questions DROP DEFAULT;
+          ALTER TABLE jobs ALTER COLUMN screening_questions TYPE JSONB 
+            USING CASE 
+              WHEN screening_questions IS NULL THEN '[]'::jsonb
+              ELSE to_jsonb(screening_questions)
+            END;
+          ALTER TABLE jobs ALTER COLUMN screening_questions SET DEFAULT '[]'::jsonb;
+        END IF; 
+      END $$;
+    `);
+
     await pool.query(
       `CREATE INDEX IF NOT EXISTS idx_jobs_organization_id ON jobs (organization_id);`,
     );
@@ -127,7 +149,7 @@ export const createTables = async () => {
       BEFORE UPDATE ON jobs FOR EACH ROW EXECUTE FUNCTION update_jobs_updated_at();
     `);
 
-    // 5. candidates & 6. candidate_interviews (unchanged)
+    // 5. candidates (has screening_answers JSONB)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS candidates (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -141,11 +163,21 @@ export const createTables = async () => {
         notice_period VARCHAR(100),
         status VARCHAR(50) NOT NULL DEFAULT 'Applied',
         stage VARCHAR(100),
+        screening_answers JSONB DEFAULT '{}'::jsonb,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT valid_candidate_status CHECK (status IN ('Applied','Screening','Interviewing','Selected','Rejected','Offered','Joined')),
         CONSTRAINT unique_job_candidate UNIQUE (job_id, email)
       );
+    `);
+
+    await pool.query(`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'candidates' AND COLUMN_NAME = 'screening_answers') THEN 
+          ALTER TABLE candidates ADD COLUMN screening_answers JSONB DEFAULT '{}'::jsonb; 
+        END IF; 
+      END $$;
     `);
 
     await pool.query(
@@ -181,6 +213,7 @@ export const createTables = async () => {
       BEFORE UPDATE ON candidates FOR EACH ROW EXECUTE FUNCTION update_candidates_updated_at();
     `);
 
+    // 6. candidate_interviews
     await pool.query(`
       CREATE TABLE IF NOT EXISTS candidate_interviews (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
