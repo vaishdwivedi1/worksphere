@@ -2,10 +2,9 @@ import pool from "../config/postgres.js";
 
 export const createTables = async () => {
   try {
-    // 0. Enable extension needed for trigram indexes
     await pool.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm;`);
 
-    // 1. organizations
+    // 1. organizations, users, organization_members (unchanged)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS organizations (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -22,7 +21,6 @@ export const createTables = async () => {
       );
     `);
 
-    // 2. users
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -37,7 +35,6 @@ export const createTables = async () => {
       );
     `);
 
-    // 3. organization_members
     await pool.query(`
       CREATE TABLE IF NOT EXISTS organization_members (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -56,7 +53,7 @@ export const createTables = async () => {
       );
     `);
 
-    // 4. jobs
+    // 4. jobs (ADDED responsibilities)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS jobs (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -69,6 +66,7 @@ export const createTables = async () => {
         experience_required VARCHAR(100),
         location VARCHAR(255),
         description TEXT,
+        responsibilities TEXT, -- NEW
         requirements TEXT[],
         skills TEXT[],
         hiring_workflow JSONB DEFAULT '[]'::jsonb,
@@ -87,6 +85,17 @@ export const createTables = async () => {
       );
     `);
 
+    // ✅ SAFETY FIX: Add column if it doesn't exist in old DB
+    await pool.query(`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'jobs' AND COLUMN_NAME = 'responsibilities') THEN 
+          ALTER TABLE jobs ADD COLUMN responsibilities TEXT; 
+        END IF; 
+      END $$;
+    `);
+
+    // Indexes & Triggers for Jobs (unchanged)
     await pool.query(
       `CREATE INDEX IF NOT EXISTS idx_jobs_organization_id ON jobs (organization_id);`,
     );
@@ -106,25 +115,19 @@ export const createTables = async () => {
       `CREATE INDEX IF NOT EXISTS idx_jobs_title_trgm ON jobs USING gin (title gin_trgm_ops);`,
     );
 
-    // updated_at trigger for jobs
     await pool.query(`
       CREATE OR REPLACE FUNCTION update_jobs_updated_at()
       RETURNS TRIGGER AS $$
-      BEGIN
-        NEW.updated_at = CURRENT_TIMESTAMP;
-        RETURN NEW;
-      END;
+      BEGIN NEW.updated_at = CURRENT_TIMESTAMP; RETURN NEW; END;
       $$ LANGUAGE plpgsql;
     `);
     await pool.query(`DROP TRIGGER IF EXISTS trg_jobs_updated_at ON jobs;`);
     await pool.query(`
       CREATE TRIGGER trg_jobs_updated_at
-      BEFORE UPDATE ON jobs
-      FOR EACH ROW
-      EXECUTE FUNCTION update_jobs_updated_at();
+      BEFORE UPDATE ON jobs FOR EACH ROW EXECUTE FUNCTION update_jobs_updated_at();
     `);
 
-    // 5. candidates
+    // 5. candidates & 6. candidate_interviews (unchanged)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS candidates (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -167,10 +170,7 @@ export const createTables = async () => {
     await pool.query(`
       CREATE OR REPLACE FUNCTION update_candidates_updated_at()
       RETURNS TRIGGER AS $$
-      BEGIN
-        NEW.updated_at = CURRENT_TIMESTAMP;
-        RETURN NEW;
-      END;
+      BEGIN NEW.updated_at = CURRENT_TIMESTAMP; RETURN NEW; END;
       $$ LANGUAGE plpgsql;
     `);
     await pool.query(
@@ -178,12 +178,9 @@ export const createTables = async () => {
     );
     await pool.query(`
       CREATE TRIGGER trg_candidates_updated_at
-      BEFORE UPDATE ON candidates
-      FOR EACH ROW
-      EXECUTE FUNCTION update_candidates_updated_at();
+      BEFORE UPDATE ON candidates FOR EACH ROW EXECUTE FUNCTION update_candidates_updated_at();
     `);
 
-    // 6. candidate_interviews
     await pool.query(`
       CREATE TABLE IF NOT EXISTS candidate_interviews (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -213,10 +210,7 @@ export const createTables = async () => {
     await pool.query(`
       CREATE OR REPLACE FUNCTION update_candidate_interviews_updated_at()
       RETURNS TRIGGER AS $$
-      BEGIN
-        NEW.updated_at = CURRENT_TIMESTAMP;
-        RETURN NEW;
-      END;
+      BEGIN NEW.updated_at = CURRENT_TIMESTAMP; RETURN NEW; END;
       $$ LANGUAGE plpgsql;
     `);
     await pool.query(
@@ -224,9 +218,7 @@ export const createTables = async () => {
     );
     await pool.query(`
       CREATE TRIGGER trg_candidate_interviews_updated_at
-      BEFORE UPDATE ON candidate_interviews
-      FOR EACH ROW
-      EXECUTE FUNCTION update_candidate_interviews_updated_at();
+      BEFORE UPDATE ON candidate_interviews FOR EACH ROW EXECUTE FUNCTION update_candidate_interviews_updated_at();
     `);
 
     console.log("All tables created successfully!");

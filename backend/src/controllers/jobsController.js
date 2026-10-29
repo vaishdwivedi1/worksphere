@@ -9,22 +9,22 @@ const FN = "JobController";
 // ============================================
 const toTextArray = (v) => {
   if (v === null || v === undefined) return [];
-  if (Array.isArray(v))
+  if (Array.isArray(v)) {
     return v.map((x) => String(x).trim()).filter((x) => x.length > 0);
+  }
   if (typeof v === "string") {
     const s = v.trim();
     if (!s) return [];
-    // JSON array string?
     if (s.startsWith("[")) {
       try {
         const parsed = JSON.parse(s);
-        if (Array.isArray(parsed))
+        if (Array.isArray(parsed)) {
           return parsed.map((x) => String(x).trim()).filter(Boolean);
+        }
       } catch {
         /* ignore, fall through */
       }
     }
-    // newline or comma separated
     return s
       .split(/\r?\n|,/)
       .map((x) => x.trim())
@@ -33,10 +33,6 @@ const toTextArray = (v) => {
   return [];
 };
 
-// ============================================
-// Normalize hiring_workflow into a real array
-// (for Postgres JSONB column)
-// ============================================
 const toWorkflowArray = (v) => {
   if (Array.isArray(v)) return v;
   if (typeof v === "string" && v.trim()) {
@@ -66,6 +62,7 @@ export const createJob = async (req, res) => {
       experience_required,
       location,
       description,
+      responsibilities,
       requirements,
       skills,
       hiring_workflow,
@@ -90,7 +87,7 @@ export const createJob = async (req, res) => {
 
     const reqs = toTextArray(requirements);
     const skillArr = toTextArray(skills);
-    const sqs = toTextArray(screening_questions);
+    const sqs = toTextArray(screening_questions); // Filters empty strings
     const workflow = toWorkflowArray(hiring_workflow);
 
     const rounds =
@@ -102,13 +99,13 @@ export const createJob = async (req, res) => {
       `INSERT INTO jobs (
         organization_id, created_by, title, department, team,
         employment_type, experience_required, location,
-        description, requirements, skills,
+        description, responsibilities, requirements, skills,
         hiring_workflow, screening_questions,
         approval_requested_by, approval_reason,
         approval_department, approval_team,
         status, total_rounds
       ) VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20
       ) RETURNING *`,
       [
         organization_id,
@@ -120,10 +117,11 @@ export const createJob = async (req, res) => {
         experience_required ?? null,
         location ?? null,
         description ?? null,
-        reqs, // real array -> TEXT[]
-        skillArr, // real array -> TEXT[]
-        JSON.stringify(workflow), // string -> JSONB
-        sqs, // real array -> TEXT[]
+        responsibilities ?? null,
+        reqs,
+        skillArr,
+        JSON.stringify(workflow),
+        sqs,
         approval_requested_by ?? null,
         approval_reason ?? null,
         approval_department ?? null,
@@ -146,7 +144,7 @@ export const createJob = async (req, res) => {
 };
 
 // ============================================
-// GET JOBS (list + filters + pagination)
+// GET JOBS
 // ============================================
 export const getJobs = async (req, res) => {
   const fn = `${FN}.getJobs`;
@@ -229,7 +227,7 @@ export const getJobs = async (req, res) => {
 };
 
 // ============================================
-// GET JOB BY ID (+ candidate stats)
+// GET JOB BY ID
 // ============================================
 export const getJobById = async (req, res) => {
   const fn = `${FN}.getJobById`;
@@ -252,9 +250,7 @@ export const getJobById = async (req, res) => {
          GROUP BY status`,
         [id],
       );
-    } catch {
-      // candidates table may not exist in some envs — don't fail the job fetch
-    }
+    } catch {}
 
     return handleSuccess(
       res,
@@ -272,7 +268,7 @@ export const getJobById = async (req, res) => {
 };
 
 // ============================================
-// UPDATE JOB (full)
+// UPDATE JOB
 // ============================================
 export const updateJob = async (req, res) => {
   const fn = `${FN}.updateJob`;
@@ -280,12 +276,10 @@ export const updateJob = async (req, res) => {
     const { id } = req.params;
     const updates = { ...req.body };
 
-    // Remove immutable / non-updatable keys
     delete updates.id;
     delete updates.organization_id;
     delete updates.created_at;
 
-    // TEXT[] columns — pass real arrays
     if (updates.requirements !== undefined)
       updates.requirements = toTextArray(updates.requirements);
     if (updates.skills !== undefined)
@@ -293,7 +287,6 @@ export const updateJob = async (req, res) => {
     if (updates.screening_questions !== undefined)
       updates.screening_questions = toTextArray(updates.screening_questions);
 
-    // JSONB column — stringify
     if (updates.hiring_workflow !== undefined) {
       const wf = toWorkflowArray(updates.hiring_workflow);
       updates.hiring_workflow = JSON.stringify(wf);
@@ -308,6 +301,7 @@ export const updateJob = async (req, res) => {
       "experience_required",
       "location",
       "description",
+      "responsibilities",
       "requirements",
       "skills",
       "hiring_workflow",
@@ -359,7 +353,7 @@ export const updateJob = async (req, res) => {
 };
 
 // ============================================
-// UPDATE JOB STATUS (PATCH)
+// UPDATE JOB STATUS
 // ============================================
 export const updateJobStatus = async (req, res) => {
   const fn = `${FN}.updateJobStatus`;

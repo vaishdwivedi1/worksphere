@@ -3,6 +3,9 @@ import pool from "../config/postgres.js";
 
 const FN = "InterviewController";
 
+// ============================================
+// CREATE INTERVIEW
+// ============================================
 export const createInterview = async (req, res) => {
   const fn = `${FN}.createInterview`;
   try {
@@ -18,11 +21,30 @@ export const createInterview = async (req, res) => {
       notes,
     } = req.body;
 
-    if (!candidate_id || !round_name) {
+    if (!candidate_id || !round_name || !round_name.trim()) {
       return handleError(
         res,
         400,
         "candidate_id and round_name are required",
+        null,
+        fn,
+      );
+    }
+
+    const finalResult = result || "Pending";
+    const finalScore =
+      score !== null && score !== undefined && score !== ""
+        ? parseInt(score, 10)
+        : null;
+
+    if (
+      finalScore !== null &&
+      (isNaN(finalScore) || finalScore < 0 || finalScore > 100)
+    ) {
+      return handleError(
+        res,
+        400,
+        "Score must be a number between 0 and 100",
         null,
         fn,
       );
@@ -36,18 +58,18 @@ export const createInterview = async (req, res) => {
       RETURNING *`,
       [
         candidate_id,
-        round_name,
-        interviewer,
-        interview_type,
-        duration,
-        feedback,
-        result,
-        score,
-        notes,
+        round_name.trim(),
+        interviewer || null,
+        interview_type || null,
+        duration || null,
+        feedback || null,
+        finalResult,
+        finalScore,
+        notes || null,
       ],
     );
 
-    // Auto-transition candidate → Interviewing
+    // Auto-transition candidate -> Interviewing (if currently early stage)
     await pool.query(
       `UPDATE candidates
        SET status = 'Interviewing'

@@ -22,7 +22,6 @@ import {
   Building,
   Phone,
   FileText,
-  Eye,
   Send,
   UserCheck,
   Award,
@@ -35,12 +34,14 @@ import {
   X,
   Loader2,
   RefreshCw,
+  PlusCircle,
+  MinusCircle,
 } from "lucide-react";
 import { api } from "../services/api";
 import APIPATHS from "../utils/APIPATHS";
 
 // ============================================
-// PATH BUILDER — replaces :param placeholders
+// PATH BUILDER
 // ============================================
 const buildPath = (template, params = {}) =>
   template.replace(/:([a-zA-Z_][a-zA-Z0-9_]*)/g, (_, key) =>
@@ -49,9 +50,6 @@ const buildPath = (template, params = {}) =>
       : "",
   );
 
-// ============================================
-// SAFE ARRAY PARSER (handles JSONB, text, null, CSV)
-// ============================================
 const asArray = (val) => {
   if (Array.isArray(val)) return val;
   if (val === null || val === undefined || val === "") return [];
@@ -62,9 +60,7 @@ const asArray = (val) => {
       try {
         const parsed = JSON.parse(trimmed);
         return Array.isArray(parsed) ? parsed : [trimmed];
-      } catch {
-        /* fall through */
-      }
+      } catch {}
     }
     if (trimmed.includes("\n")) {
       return trimmed
@@ -83,9 +79,6 @@ const asArray = (val) => {
   return [];
 };
 
-// ============================================
-// MAPPERS (snake_case API → camelCase UI)
-// ============================================
 const mapJobFromApi = (j) => ({
   id: j.id,
   title: j.title || "",
@@ -99,6 +92,7 @@ const mapJobFromApi = (j) => ({
   createdAt: j.created_at ? new Date(j.created_at).toLocaleDateString() : "—",
   rounds: Number(j.total_rounds) || 0,
   description: j.description || "",
+  responsibilities: j.responsibilities || "",
   requirements: asArray(j.requirements),
   skills: asArray(j.skills),
   hiringWorkflow: asArray(j.hiring_workflow),
@@ -124,6 +118,7 @@ const mapCandidateFromApi = (c) => ({
   stage: c.stage || c.status || "Applied",
   noticePeriod: c.notice_period || "—",
   interviewHistory: asArray(c.interviews).map((i) => ({
+    id: i.id,
     round: i.round_name || i.round || "—",
     interviewer: i.interviewer || "—",
     feedback: i.feedback || "",
@@ -137,9 +132,6 @@ const mapCandidateFromApi = (c) => ({
   _raw: c,
 });
 
-// ============================================
-// DEBOUNCE HOOK
-// ============================================
 const useDebounced = (value, delay = 400) => {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -149,9 +141,6 @@ const useDebounced = (value, delay = 400) => {
   return debounced;
 };
 
-// ============================================
-// DEFAULT FORM
-// ============================================
 const emptyForm = () => ({
   title: "",
   department: "",
@@ -160,39 +149,57 @@ const emptyForm = () => ({
   employmentType: "full-time",
   location: "remote",
   description: "",
+  responsibilities: "",
   requirements: "",
   skills: "",
   rounds: 3,
-  screeningQuestions: "",
+  screeningQuestions: [""], // Array of strings for dynamic UI
 });
 
-// ============================================
-// COMPONENT
-// ============================================
 const HRJobs = () => {
   const [selectedJob, setSelectedJob] = useState(null);
   const [showJobModal, setShowJobModal] = useState(false);
   const [showCandidateModal, setShowCandidateModal] = useState(false);
+  const [showAddCandidateModal, setShowAddCandidateModal] = useState(false);
+  const [showInterviewModal, setShowInterviewModal] = useState(false);
+
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [editingJob, setEditingJob] = useState(null);
 
-  // ========== API state ==========
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  // Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [deptFilter, setDeptFilter] = useState("all");
-
   const debouncedSearch = useDebounced(searchQuery, 400);
 
-  // Create/Edit form state
   const [jobForm, setJobForm] = useState(emptyForm());
 
-  // ---------- organization ----------
+  // Candidate Add Form state
+  const [candidateForm, setCandidateForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    experience: "",
+    notice_period: "",
+    resume_url: "",
+  });
+
+  // Interview Form state
+  const [interviewForm, setInterviewForm] = useState({
+    round_name: "",
+    interviewer: "",
+    interview_type: "Technical",
+    duration: "60 mins",
+    feedback: "",
+    result: "Pending",
+    score: "",
+    notes: "",
+  });
+
   const organizationId = useMemo(() => {
     try {
       const org = JSON.parse(localStorage.getItem("org") || "{}");
@@ -262,21 +269,20 @@ const HRJobs = () => {
   };
 
   const createJobApi = (payload) => api.post(APIPATHS.createJob, payload);
-
   const updateJobApi = (id, payload) =>
     api.put(buildPath(APIPATHS.updateJob, { id }), payload);
-
   const updateJobStatusApi = (id, status) =>
     api.patch(buildPath(APIPATHS.updateJobStatus, { id }), { status });
-
   const deleteJobApi = (id) =>
     api.delete(buildPath(APIPATHS.deleteJob, { id }));
-
   const getCandidateByIdApi = (id) =>
     api.get(buildPath(APIPATHS.getCandidateById, { id }));
-
   const updateCandidateStatusApi = (id, status) =>
     api.patch(buildPath(APIPATHS.updateCandidateStatus, { id }), { status });
+  const createInterviewApi = (payload) =>
+    api.post(APIPATHS.createInterview, payload);
+  const createCandidateApi = (payload) =>
+    api.post(APIPATHS.createCandidate, payload);
 
   // ============================================
   // HANDLERS
@@ -299,10 +305,13 @@ const HRJobs = () => {
       employmentType: (job.employmentType || "full-time").toLowerCase(),
       location: (job.location || "remote").toLowerCase(),
       description: job.description || "",
+      responsibilities: job.responsibilities || "",
       requirements: (job.requirements || []).join("\n"),
       skills: (job.skills || []).join(", "),
       rounds: job.rounds || 1,
-      screeningQuestions: (job.screeningQuestions || []).join("\n"),
+      // Convert existing array to dynamic fields (ensure at least 1 input)
+      screeningQuestions:
+        job.screeningQuestions.length > 0 ? job.screeningQuestions : [""],
     });
     setShowJobModal(true);
   };
@@ -332,18 +341,11 @@ const HRJobs = () => {
 
   const handleSubmitJob = async (e) => {
     e.preventDefault();
-
-    if (!organizationId) {
-      alert("Organization not found. Please log in again.");
-      return;
-    }
-    if (!jobForm.title.trim() || !jobForm.department) {
-      alert("Job Title and Department are required");
-      return;
-    }
+    if (!organizationId) return alert("Organization not found.");
+    if (!jobForm.title.trim() || !jobForm.department)
+      return alert("Title and Department required");
 
     setSubmitting(true);
-
     try {
       const requirements = jobForm.requirements
         .split("\n")
@@ -353,10 +355,11 @@ const HRJobs = () => {
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean);
-      const screening_questions = jobForm.screeningQuestions
-        .split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean);
+
+      // Filter out empty screening questions
+      const screening_questions = jobForm.screeningQuestions.filter(
+        (q) => q.trim() !== "",
+      );
 
       const roundsNum = Math.max(1, parseInt(jobForm.rounds, 10) || 1);
 
@@ -379,10 +382,11 @@ const HRJobs = () => {
         location:
           jobForm.location.charAt(0).toUpperCase() + jobForm.location.slice(1),
         description: jobForm.description.trim() || null,
+        responsibilities: jobForm.responsibilities.trim() || null,
         requirements,
         skills,
         hiring_workflow,
-        screening_questions,
+        screening_questions, // Array of strings
         total_rounds: roundsNum,
         status: editingJob ? undefined : "Draft",
       };
@@ -406,10 +410,10 @@ const HRJobs = () => {
     }
   };
 
+  // --- Candidate Handlers ---
   const handleViewCandidate = async (candidate) => {
     setSelectedCandidate(candidate);
     setShowCandidateModal(true);
-
     try {
       const res = await getCandidateByIdApi(candidate.id);
       if (res?.success && res.data) {
@@ -417,6 +421,45 @@ const HRJobs = () => {
       }
     } catch (err) {
       console.error("Failed to fetch candidate details:", err);
+    }
+  };
+
+  const handleOpenAddCandidate = () => {
+    setCandidateForm({
+      name: "",
+      email: "",
+      phone: "",
+      experience: "",
+      notice_period: "",
+      resume_url: "",
+    });
+    setShowAddCandidateModal(true);
+  };
+
+  const handleSubmitCandidate = async (e) => {
+    e.preventDefault();
+    if (!selectedJob) return;
+    setSubmitting(true);
+    try {
+      const payload = {
+        ...candidateForm,
+        job_id: selectedJob.id,
+        organization_id: organizationId,
+      };
+      const res = await createCandidateApi(payload);
+      if (res?.success) {
+        setShowAddCandidateModal(false);
+        // Refresh candidates list in the modal
+        const candidates = await fetchCandidatesByJobApi(selectedJob.id);
+        setSelectedJob((prev) => (prev ? { ...prev, candidates } : prev));
+        fetchJobsApi(); // Refresh jobs to update total_applicants count
+      } else {
+        alert(res?.message || "Failed to add candidate");
+      }
+    } catch (err) {
+      alert(err?.message || "Failed to add candidate");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -440,17 +483,69 @@ const HRJobs = () => {
     }
   };
 
+  // --- Interview Handlers ---
   const handleScheduleInterview = (candidate) => {
-    alert(`Schedule interview for ${candidate.name} (coming soon)`);
+    setInterviewForm({
+      round_name: "",
+      interviewer: "",
+      interview_type: "Technical",
+      duration: "60 mins",
+      feedback: "",
+      result: "Pending",
+      score: "",
+      notes: "",
+    });
+    setShowInterviewModal(true);
   };
 
-  const handleSendMessage = (candidate) => {
-    alert(`Send message to ${candidate.name} (coming soon)`);
+  const handleSubmitInterview = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const payload = {
+        candidate_id: selectedCandidate.id,
+        ...interviewForm,
+        score: interviewForm.score ? parseInt(interviewForm.score, 10) : null,
+      };
+      const res = await createInterviewApi(payload);
+      if (res?.success) {
+        setShowInterviewModal(false);
+        const updatedCand = await getCandidateByIdApi(selectedCandidate.id);
+        if (updatedCand?.success) {
+          setSelectedCandidate(mapCandidateFromApi(updatedCand.data));
+        }
+        fetchJobsApi();
+      } else {
+        alert(res?.message || "Failed to add interview");
+      }
+    } catch (err) {
+      alert(err?.message || "Failed to add interview");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  // ============================================
-  // STYLING HELPERS
-  // ============================================
+  // --- Dynamic Screening Questions Handlers ---
+  const handleAddQuestion = () => {
+    setJobForm({
+      ...jobForm,
+      screeningQuestions: [...jobForm.screeningQuestions, ""],
+    });
+  };
+
+  const handleUpdateQuestion = (index, value) => {
+    const newQs = [...jobForm.screeningQuestions];
+    newQs[index] = value;
+    setJobForm({ ...jobForm, screeningQuestions: newQs });
+  };
+
+  const handleRemoveQuestion = (index) => {
+    if (jobForm.screeningQuestions.length === 1) return; // keep at least one
+    const newQs = jobForm.screeningQuestions.filter((_, i) => i !== index);
+    setJobForm({ ...jobForm, screeningQuestions: newQs });
+  };
+
+  // --- Styling Helpers ---
   const statusColors = {
     Open: "bg-green-100 text-green-700 border-green-200",
     Draft: "bg-gray-100 text-gray-700 border-gray-200",
@@ -507,12 +602,9 @@ const HRJobs = () => {
     }
   };
 
-  // ============================================
-  // RENDER
-  // ============================================
   return (
     <div className="w-full overflow-scroll h-[80dvh]">
-      {/* Header with Stats */}
+      {/* Header, Stats, Search etc. (Same as before) */}
       <div className="flex justify-between items-center w-full gap-4 mb-6">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 flex-1">
           {[
@@ -574,7 +666,6 @@ const HRJobs = () => {
           <button
             onClick={fetchJobsApi}
             disabled={loading}
-            title="Refresh"
             className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-60"
           >
             <RefreshCw
@@ -589,13 +680,12 @@ const HRJobs = () => {
             }}
             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-medium whitespace-nowrap"
           >
-            <Plus className="w-4 h-4" />
-            Create Job
+            <Plus className="w-4 h-4" /> Create Job
           </button>
         </div>
       </div>
 
-      {/* Search & Filters */}
+      {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
         <div className="flex-1 min-w-[200px] relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -603,8 +693,8 @@ const HRJobs = () => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search jobs or candidates..."
-            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-black placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10"
+            placeholder="Search jobs..."
+            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-black focus:outline-none focus:border-emerald-500"
           />
         </div>
         <select
@@ -633,28 +723,21 @@ const HRJobs = () => {
         </select>
       </div>
 
-      {/* Error banner */}
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm flex items-center gap-2">
           <AlertCircle className="w-4 h-4" />
           {error}
         </div>
       )}
-
-      {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-16 text-gray-500 text-sm">
           <Loader2 className="w-5 h-5 animate-spin mr-2" />
           Loading jobs…
         </div>
       )}
-
-      {/* Empty */}
       {!loading && jobs.length === 0 && !error && (
         <div className="text-center py-16 text-gray-500 text-sm">
-          No jobs found. Click{" "}
-          <span className="font-medium text-gray-700">Create Job</span> to add
-          one.
+          No jobs found.
         </div>
       )}
 
@@ -699,7 +782,6 @@ const HRJobs = () => {
                   </div>
                 </div>
               </div>
-
               <div className="p-4">
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   <div className="bg-gray-50 rounded-lg p-2">
@@ -714,56 +796,30 @@ const HRJobs = () => {
                       {job.rounds}
                     </p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-2">
-                    <p className="text-xs text-gray-500">Created</p>
-                    <p className="text-sm font-medium text-gray-800">
-                      {job.createdAt}
-                    </p>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-2">
-                    <p className="text-xs text-gray-500">Type</p>
-                    <p className="text-sm font-medium text-gray-800">
-                      {job.employmentType}
-                    </p>
-                  </div>
                 </div>
-
-                {job.skills.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    {job.skills.map((skill, idx) => (
-                      <span
-                        key={idx}
-                        className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs"
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
                 <div className="flex items-center gap-1.5 pt-3 border-t border-gray-100 flex-wrap">
                   <button
                     onClick={() => handleViewJob(job)}
-                    className="flex items-center justify-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-all text-xs font-medium"
+                    className="px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 text-xs font-medium"
                   >
-                    View Details
+                    View
                   </button>
                   <button
                     onClick={() => handleEditJob(job)}
-                    className="flex items-center justify-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all text-xs font-medium"
+                    className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 text-xs font-medium"
                   >
-                    <Edit className="w-3.5 h-3.5" />
+                    <Edit className="w-3.5 h-3.5 inline mr-1" />
                     Edit
                   </button>
                   <button
                     onClick={() => handleArchive(job)}
-                    className="flex items-center justify-center gap-1 px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-all text-xs font-medium"
+                    className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 text-xs font-medium"
                   >
                     <Archive className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => handleDelete(job)}
-                    className="flex items-center justify-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all text-xs font-medium"
+                    className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-xs font-medium"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -774,7 +830,7 @@ const HRJobs = () => {
         </div>
       )}
 
-      {/* Job Detail Modal */}
+      {/* Job Details Modal */}
       {selectedJob && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -784,12 +840,11 @@ const HRJobs = () => {
               </h2>
               <button
                 onClick={() => setSelectedJob(null)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-all"
+                className="p-2 hover:bg-gray-100 rounded-lg"
               >
                 <XCircle className="w-5 h-5 text-gray-500" />
               </button>
             </div>
-
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
@@ -844,6 +899,17 @@ const HRJobs = () => {
                   {selectedJob.description || "—"}
                 </p>
               </div>
+
+              {selectedJob.responsibilities && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                    Responsibilities
+                  </h4>
+                  <p className="text-sm text-gray-600 whitespace-pre-wrap">
+                    {selectedJob.responsibilities}
+                  </p>
+                </div>
+              )}
 
               {selectedJob.requirements.length > 0 && (
                 <div>
@@ -942,13 +1008,17 @@ const HRJobs = () => {
                 </div>
               </div>
 
+              {/* CANDIDATES SECTION with ADD CANDIDATE button */}
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-sm font-semibold text-gray-700">
                     Candidates
                   </h4>
-                  <button className="text-xs text-emerald-600 font-medium hover:text-emerald-700">
-                    View All ({selectedJob.candidates.length})
+                  <button
+                    onClick={handleOpenAddCandidate}
+                    className="flex items-center gap-1 text-xs bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg hover:bg-emerald-100 font-medium transition-all"
+                  >
+                    <PlusCircle className="w-4 h-4" /> Add Candidate
                   </button>
                 </div>
                 <div className="space-y-2">
@@ -978,14 +1048,13 @@ const HRJobs = () => {
                           {getCandidateStatusIcon(candidate.status)}
                           {candidate.status}
                         </span>
-                        <span className="text-xs text-gray-500 hidden sm:inline">
-                          {candidate.experience}
-                        </span>
                       </div>
                     </div>
                   ))}
                   {selectedJob.candidates.length === 0 && (
-                    <p className="text-sm text-gray-500">No candidates yet.</p>
+                    <p className="text-sm text-gray-500">
+                      No candidates yet. Click "Add Candidate" to add one.
+                    </p>
                   )}
                 </div>
               </div>
@@ -1014,12 +1083,11 @@ const HRJobs = () => {
               </div>
               <button
                 onClick={() => setShowCandidateModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-all flex-shrink-0"
+                className="p-2 hover:bg-gray-100 rounded-lg flex-shrink-0"
               >
                 <XCircle className="w-5 h-5 text-gray-500" />
               </button>
             </div>
-
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-2 gap-3">
                 {[
@@ -1086,13 +1154,7 @@ const HRJobs = () => {
                               </p>
                             </div>
                             <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-medium border ${
-                                interview.result === "Passed"
-                                  ? "bg-green-100 text-green-700 border-green-200"
-                                  : interview.result === "Failed"
-                                    ? "bg-red-100 text-red-700 border-red-200"
-                                    : "bg-yellow-100 text-yellow-700 border-yellow-200"
-                              }`}
+                              className={`px-2 py-0.5 rounded-full text-xs font-medium border ${interview.result === "Passed" ? "bg-green-100 text-green-700 border-green-200" : interview.result === "Failed" ? "bg-red-100 text-red-700 border-red-200" : "bg-yellow-100 text-yellow-700 border-yellow-200"}`}
                             >
                               {interview.result || "Pending"}
                             </span>
@@ -1140,22 +1202,13 @@ const HRJobs = () => {
                   onClick={() => handleScheduleInterview(selectedCandidate)}
                   className="flex-1 min-w-[120px] flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-medium"
                 >
-                  <UserCheck className="w-4 h-4" />
-                  Schedule Interview
-                </button>
-                <button
-                  onClick={() => handleSendMessage(selectedCandidate)}
-                  className="flex-1 min-w-[120px] flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all text-sm font-medium"
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  Send Message
+                  <UserCheck className="w-4 h-4" /> Schedule Interview
                 </button>
                 <button
                   onClick={() => handleRejectCandidate(selectedCandidate)}
                   className="flex-1 min-w-[120px] flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all text-sm font-medium"
                 >
-                  <XCircle className="w-4 h-4" />
-                  Reject
+                  <XCircle className="w-4 h-4" /> Reject
                 </button>
               </div>
             </div>
@@ -1176,12 +1229,11 @@ const HRJobs = () => {
                   setShowJobModal(false);
                   setEditingJob(null);
                 }}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-all"
+                className="p-2 hover:bg-gray-100 rounded-lg"
               >
                 <XCircle className="w-5 h-5 text-gray-500" />
               </button>
             </div>
-
             <div className="p-6">
               <form className="space-y-4" onSubmit={handleSubmitJob}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1195,8 +1247,7 @@ const HRJobs = () => {
                       onChange={(e) =>
                         setJobForm({ ...jobForm, title: e.target.value })
                       }
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:outline-none focus:border-emerald-500"
-                      placeholder="e.g., Senior Software Engineer"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:border-emerald-500"
                       required
                     />
                   </div>
@@ -1209,7 +1260,7 @@ const HRJobs = () => {
                       onChange={(e) =>
                         setJobForm({ ...jobForm, department: e.target.value })
                       }
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:outline-none focus:border-emerald-500"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:border-emerald-500"
                       required
                     >
                       <option value="">Select Department</option>
@@ -1230,8 +1281,7 @@ const HRJobs = () => {
                       onChange={(e) =>
                         setJobForm({ ...jobForm, team: e.target.value })
                       }
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:outline-none focus:border-emerald-500"
-                      placeholder="e.g., Backend Team"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:border-emerald-500"
                     />
                   </div>
                   <div>
@@ -1243,7 +1293,7 @@ const HRJobs = () => {
                       onChange={(e) =>
                         setJobForm({ ...jobForm, experience: e.target.value })
                       }
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:outline-none focus:border-emerald-500"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:border-emerald-500"
                     >
                       <option value="">Select Experience</option>
                       <option value="0-2 years">0-2 years</option>
@@ -1264,7 +1314,7 @@ const HRJobs = () => {
                           employmentType: e.target.value,
                         })
                       }
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:outline-none focus:border-emerald-500"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:border-emerald-500"
                     >
                       <option value="full-time">Full-time</option>
                       <option value="part-time">Part-time</option>
@@ -1281,7 +1331,7 @@ const HRJobs = () => {
                       onChange={(e) =>
                         setJobForm({ ...jobForm, location: e.target.value })
                       }
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:outline-none focus:border-emerald-500"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:border-emerald-500"
                     >
                       <option value="remote">Remote</option>
                       <option value="hybrid">Hybrid</option>
@@ -1292,22 +1342,40 @@ const HRJobs = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Description
+                    Job Description
                   </label>
                   <textarea
-                    rows="3"
+                    rows="2"
                     value={jobForm.description}
                     onChange={(e) =>
                       setJobForm({ ...jobForm, description: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:outline-none focus:border-emerald-500"
-                    placeholder="Job description..."
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:border-emerald-500"
+                    placeholder="Short description..."
                   ></textarea>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Requirements
+                    Responsibilities
+                  </label>
+                  <textarea
+                    rows="2"
+                    value={jobForm.responsibilities}
+                    onChange={(e) =>
+                      setJobForm({
+                        ...jobForm,
+                        responsibilities: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:border-emerald-500"
+                    placeholder="Key responsibilities..."
+                  ></textarea>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Requirements (one per line)
                   </label>
                   <textarea
                     rows="2"
@@ -1315,14 +1383,13 @@ const HRJobs = () => {
                     onChange={(e) =>
                       setJobForm({ ...jobForm, requirements: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:outline-none focus:border-emerald-500"
-                    placeholder="Enter requirements (one per line)"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:border-emerald-500"
                   ></textarea>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Skills
+                    Skills (comma separated)
                   </label>
                   <input
                     type="text"
@@ -1330,8 +1397,7 @@ const HRJobs = () => {
                     onChange={(e) =>
                       setJobForm({ ...jobForm, skills: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:outline-none focus:border-emerald-500"
-                    placeholder="e.g., JavaScript, Python, AWS (comma separated)"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:border-emerald-500"
                   />
                 </div>
 
@@ -1345,29 +1411,52 @@ const HRJobs = () => {
                     onChange={(e) =>
                       setJobForm({ ...jobForm, rounds: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:outline-none focus:border-emerald-500"
-                    placeholder="e.g., 3"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:border-emerald-500"
                     min="1"
                     max="10"
                   />
                 </div>
 
+                {/* SCREENING QUESTIONS DYNAMIC UI */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Screening Questions
-                  </label>
-                  <textarea
-                    rows="2"
-                    value={jobForm.screeningQuestions}
-                    onChange={(e) =>
-                      setJobForm({
-                        ...jobForm,
-                        screeningQuestions: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:outline-none focus:border-emerald-500"
-                    placeholder="Enter screening questions (one per line)"
-                  ></textarea>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Screening Questions
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAddQuestion}
+                      className="text-xs flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-medium"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" /> Add Question
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {jobForm.screeningQuestions.map((q, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-gray-400 w-4">
+                          Q{idx + 1}
+                        </span>
+                        <input
+                          type="text"
+                          value={q}
+                          onChange={(e) =>
+                            handleUpdateQuestion(idx, e.target.value)
+                          }
+                          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-black focus:border-emerald-500"
+                          placeholder="e.g., Are you comfortable with on-call rotations?"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveQuestion(idx)}
+                          disabled={jobForm.screeningQuestions.length === 1}
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <MinusCircle className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-200">
@@ -1390,6 +1479,257 @@ const HRJobs = () => {
                       setEditingJob(null);
                     }}
                     className="flex-1 min-w-[120px] px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all text-sm font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Candidate Modal */}
+      {showAddCandidateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between z-10">
+              <h2 className="text-lg font-bold text-gray-800">
+                Add New Candidate
+              </h2>
+              <button
+                onClick={() => setShowAddCandidateModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <XCircle className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-6">
+              <form className="space-y-4" onSubmit={handleSubmitCandidate}>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={candidateForm.name}
+                    onChange={(e) =>
+                      setCandidateForm({
+                        ...candidateForm,
+                        name: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Email *
+                  </label>
+                  <input
+                    type="email"
+                    value={candidateForm.email}
+                    onChange={(e) =>
+                      setCandidateForm({
+                        ...candidateForm,
+                        email: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Phone
+                  </label>
+                  <input
+                    type="text"
+                    value={candidateForm.phone}
+                    onChange={(e) =>
+                      setCandidateForm({
+                        ...candidateForm,
+                        phone: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Experience
+                  </label>
+                  <input
+                    type="text"
+                    value={candidateForm.experience}
+                    onChange={(e) =>
+                      setCandidateForm({
+                        ...candidateForm,
+                        experience: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    placeholder="e.g., 3 years"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Notice Period
+                  </label>
+                  <input
+                    type="text"
+                    value={candidateForm.notice_period}
+                    onChange={(e) =>
+                      setCandidateForm({
+                        ...candidateForm,
+                        notice_period: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    placeholder="e.g., 2 weeks"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Resume URL
+                  </label>
+                  <input
+                    type="url"
+                    value={candidateForm.resume_url}
+                    onChange={(e) =>
+                      setCandidateForm({
+                        ...candidateForm,
+                        resume_url: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    placeholder="https://..."
+                  />
+                </div>
+                <div className="flex gap-3 pt-4 border-t">
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="flex-1 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium"
+                  >
+                    {submitting ? "Saving..." : "Add Candidate"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCandidateModal(false)}
+                    className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Interview Modal */}
+      {showInterviewModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between z-10">
+              <h2 className="text-lg font-bold text-gray-800">
+                Schedule Interview
+              </h2>
+              <button
+                onClick={() => setShowInterviewModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <XCircle className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-6">
+              <form className="space-y-4" onSubmit={handleSubmitInterview}>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Round Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={interviewForm.round_name}
+                    onChange={(e) =>
+                      setInterviewForm({
+                        ...interviewForm,
+                        round_name: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    required
+                    placeholder="e.g., Technical Round 1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Interviewer
+                  </label>
+                  <input
+                    type="text"
+                    value={interviewForm.interviewer}
+                    onChange={(e) =>
+                      setInterviewForm({
+                        ...interviewForm,
+                        interviewer: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    placeholder="e.g., John Doe"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Type
+                    </label>
+                    <select
+                      value={interviewForm.interview_type}
+                      onChange={(e) =>
+                        setInterviewForm({
+                          ...interviewForm,
+                          interview_type: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    >
+                      <option value="Technical">Technical</option>
+                      <option value="HR">HR</option>
+                      <option value="Managerial">Managerial</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Duration
+                    </label>
+                    <input
+                      type="text"
+                      value={interviewForm.duration}
+                      onChange={(e) =>
+                        setInterviewForm({
+                          ...interviewForm,
+                          duration: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-4 border-t">
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="flex-1 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium"
+                  >
+                    {submitting ? "Saving..." : "Save Interview"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowInterviewModal(false)}
+                    className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium"
                   >
                     Cancel
                   </button>

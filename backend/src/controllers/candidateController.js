@@ -31,25 +31,30 @@ export const createCandidate = async (req, res) => {
       );
     }
 
+    // Default stage/status
+    const finalStage = stage && stage.trim() ? stage : "Applied";
+
     const result = await pool.query(
       `INSERT INTO candidates (
         job_id, organization_id, name, email, phone,
-        resume_url, experience, notice_period, stage
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+        resume_url, experience, notice_period, stage, status
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
       RETURNING *`,
       [
         job_id,
         organization_id,
         name,
         email,
-        phone,
-        resume_url,
-        experience,
-        notice_period,
-        stage,
+        phone || null,
+        resume_url || null,
+        experience || null,
+        notice_period || null,
+        finalStage,
+        "Applied", // Force initial status
       ],
     );
 
+    // Increment total_applicants in jobs table
     await pool.query(
       "UPDATE jobs SET total_applicants = total_applicants + 1 WHERE id = $1",
       [job_id],
@@ -88,7 +93,9 @@ export const getCandidates = async (req, res) => {
       status,
       search,
       page = 1,
-      limit = 20,
+      limit = 50,
+      sort = "created_at",
+      order = "DESC",
     } = req.query;
 
     const conditions = [];
@@ -103,7 +110,7 @@ export const getCandidates = async (req, res) => {
       conditions.push(`organization_id = $${idx++}`);
       values.push(organization_id);
     }
-    if (status) {
+    if (status && status !== "all") {
       conditions.push(`status = $${idx++}`);
       values.push(status);
     }
@@ -114,19 +121,25 @@ export const getCandidates = async (req, res) => {
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 50));
+    const offset = (pageNum - 1) * limitNum;
+
+    const allowedSort = ["created_at", "updated_at", "name", "status"];
+    const sortCol = allowedSort.includes(sort) ? sort : "created_at";
+    const sortOrder = order.toUpperCase() === "ASC" ? "ASC" : "DESC";
 
     const countResult = await pool.query(
-      `SELECT COUNT(*) FROM candidates ${where}`,
+      `SELECT COUNT(*)::int AS count FROM candidates ${where}`,
       values,
     );
-    const total = parseInt(countResult.rows[0].count);
+    const total = countResult.rows[0].count;
 
-    const offset = (page - 1) * limit;
-    values.push(limit, offset);
-
+    values.push(limitNum, offset);
     const result = await pool.query(
-      `SELECT * FROM candidates ${where}
-       ORDER BY created_at DESC
+      `SELECT * FROM candidates
+       ${where}
+       ORDER BY ${sortCol} ${sortOrder}
        LIMIT $${idx++} OFFSET $${idx++}`,
       values,
     );
@@ -139,9 +152,9 @@ export const getCandidates = async (req, res) => {
         candidates: result.rows,
         pagination: {
           total,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          totalPages: Math.ceil(total / limit),
+          page: pageNum,
+          limit: limitNum,
+          totalPages: Math.ceil(total / limitNum),
         },
       },
       fn,
@@ -152,7 +165,7 @@ export const getCandidates = async (req, res) => {
 };
 
 // ============================================
-// GET SINGLE CANDIDATE + INTERVIEW HISTORY
+// GET SINGLE CANDIDATE
 // ============================================
 export const getCandidateById = async (req, res) => {
   const fn = `${FN}.getCandidateById`;
