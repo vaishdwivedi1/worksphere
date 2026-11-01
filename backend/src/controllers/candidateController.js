@@ -16,7 +16,15 @@ export const createCandidate = async (req, res) => {
       experience,
       notice_period,
       stage,
-      screening_answers, // NEW: { "Question text": "Candidate's answer" }
+      screening_answers,
+      salary_expectation,
+      linkedin_url,
+      portfolio_url,
+      github_url,
+      current_company,
+      current_designation,
+      hr_call_notes,
+      hr_call_status,
     } = req.body;
 
     if (!job_id || !organization_id || !name || !email) {
@@ -34,8 +42,10 @@ export const createCandidate = async (req, res) => {
     const result = await pool.query(
       `INSERT INTO candidates (
         job_id, organization_id, name, email, phone,
-        resume_url, experience, notice_period, stage, status, screening_answers
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        resume_url, experience, notice_period, stage, status, screening_answers,
+        salary_expectation, linkedin_url, portfolio_url, github_url,
+        current_company, current_designation, hr_call_notes, hr_call_status
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
       RETURNING *`,
       [
         job_id,
@@ -49,6 +59,14 @@ export const createCandidate = async (req, res) => {
         finalStage,
         "Applied",
         JSON.stringify(screening_answers || {}),
+        salary_expectation || null,
+        linkedin_url || null,
+        portfolio_url || null,
+        github_url || null,
+        current_company || null,
+        current_designation || null,
+        hr_call_notes || null,
+        hr_call_status || "Pending",
       ],
     );
 
@@ -78,6 +96,9 @@ export const createCandidate = async (req, res) => {
   }
 };
 
+// ============================================
+// GET CANDIDATES
+// ============================================
 export const getCandidates = async (req, res) => {
   const fn = `${FN}.getCandidates`;
   try {
@@ -155,19 +176,29 @@ export const getCandidates = async (req, res) => {
   }
 };
 
+// ============================================
+// GET CANDIDATE BY ID (with rounds)
+// ============================================
 export const getCandidateById = async (req, res) => {
   const fn = `${FN}.getCandidateById`;
   try {
     const { id } = req.params;
+
     const candidate = await pool.query(
       "SELECT * FROM candidates WHERE id = $1",
       [id],
     );
-    if (candidate.rows.length === 0)
+    if (!candidate.rows.length) {
       return handleError(res, 404, "Candidate not found", null, fn);
+    }
 
     const interviews = await pool.query(
       `SELECT * FROM candidate_interviews WHERE candidate_id = $1 ORDER BY created_at ASC`,
+      [id],
+    );
+
+    const rounds = await pool.query(
+      `SELECT * FROM candidate_rounds WHERE candidate_id = $1 ORDER BY round_number ASC, created_at ASC`,
       [id],
     );
 
@@ -178,6 +209,7 @@ export const getCandidateById = async (req, res) => {
       {
         ...candidate.rows[0],
         interviews: interviews.rows,
+        rounds: rounds.rows,
       },
       fn,
     );
@@ -186,6 +218,9 @@ export const getCandidateById = async (req, res) => {
   }
 };
 
+// ============================================
+// UPDATE CANDIDATE
+// ============================================
 export const updateCandidate = async (req, res) => {
   const fn = `${FN}.updateCandidate`;
   try {
@@ -202,6 +237,14 @@ export const updateCandidate = async (req, res) => {
       "status",
       "stage",
       "screening_answers",
+      "salary_expectation",
+      "linkedin_url",
+      "portfolio_url",
+      "github_url",
+      "current_company",
+      "current_designation",
+      "hr_call_notes",
+      "hr_call_status",
     ];
     const fields = [];
     const values = [];
@@ -242,6 +285,9 @@ export const updateCandidate = async (req, res) => {
   }
 };
 
+// ============================================
+// UPDATE CANDIDATE STATUS
+// ============================================
 export const updateCandidateStatus = async (req, res) => {
   const fn = `${FN}.updateCandidateStatus`;
   try {
@@ -283,6 +329,9 @@ export const updateCandidateStatus = async (req, res) => {
   }
 };
 
+// ============================================
+// DELETE CANDIDATE
+// ============================================
 export const deleteCandidate = async (req, res) => {
   const fn = `${FN}.deleteCandidate`;
   try {
@@ -309,5 +358,152 @@ export const deleteCandidate = async (req, res) => {
     );
   } catch (err) {
     return handleError(res, 500, "Failed to delete candidate", err, fn);
+  }
+};
+
+// ============================================
+// ============ ROUNDS CRUD ===================
+// ============================================
+
+export const createRound = async (req, res) => {
+  const fn = `${FN}.createRound`;
+  try {
+    const {
+      candidate_id,
+      round_number,
+      round_name,
+      round_type,
+      interviewer,
+      status,
+      questions_asked,
+      overall_feedback,
+      overall_score,
+      scheduled_at,
+      conducted_at,
+    } = req.body;
+
+    if (!candidate_id || !round_name) {
+      return handleError(
+        res,
+        400,
+        "candidate_id and round_name are required",
+        null,
+        fn,
+      );
+    }
+
+    const result = await pool.query(
+      `INSERT INTO candidate_rounds (
+        candidate_id, round_number, round_name, round_type, interviewer, status,
+        questions_asked, overall_feedback, overall_score, scheduled_at, conducted_at
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      RETURNING *`,
+      [
+        candidate_id,
+        round_number || 1,
+        round_name,
+        round_type || "Interview",
+        interviewer || null,
+        status || "Pending",
+        JSON.stringify(questions_asked || []),
+        overall_feedback || null,
+        overall_score != null && overall_score !== ""
+          ? parseInt(overall_score, 10)
+          : null,
+        scheduled_at || null,
+        conducted_at || null,
+      ],
+    );
+
+    return handleSuccess(
+      res,
+      201,
+      "Round created successfully",
+      result.rows[0],
+      fn,
+    );
+  } catch (err) {
+    if (err.code === "23514")
+      return handleError(res, 400, "Invalid status or score", err, fn);
+    return handleError(res, 500, "Failed to create round", err, fn);
+  }
+};
+
+export const updateRound = async (req, res) => {
+  const fn = `${FN}.updateRound`;
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    const allowed = [
+      "round_number",
+      "round_name",
+      "round_type",
+      "interviewer",
+      "status",
+      "questions_asked",
+      "overall_feedback",
+      "overall_score",
+      "scheduled_at",
+      "conducted_at",
+    ];
+    const fields = [];
+    const values = [];
+    let idx = 1;
+
+    for (const key of allowed) {
+      if (updates[key] !== undefined) {
+        fields.push(`${key} = $${idx++}`);
+        values.push(
+          key === "questions_asked"
+            ? JSON.stringify(updates[key])
+            : key === "overall_score" &&
+                updates[key] !== null &&
+                updates[key] !== ""
+              ? parseInt(updates[key], 10)
+              : updates[key],
+        );
+      }
+    }
+
+    if (!fields.length)
+      return handleError(res, 400, "No valid fields to update", null, fn);
+
+    values.push(id);
+    const result = await pool.query(
+      `UPDATE candidate_rounds SET ${fields.join(", ")} WHERE id = $${idx} RETURNING *`,
+      values,
+    );
+
+    if (!result.rows.length)
+      return handleError(res, 404, "Round not found", null, fn);
+
+    return handleSuccess(
+      res,
+      200,
+      "Round updated successfully",
+      result.rows[0],
+      fn,
+    );
+  } catch (err) {
+    if (err.code === "23514")
+      return handleError(res, 400, "Invalid status or score", err, fn);
+    return handleError(res, 500, "Failed to update round", err, fn);
+  }
+};
+
+export const deleteRound = async (req, res) => {
+  const fn = `${FN}.deleteRound`;
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      "DELETE FROM candidate_rounds WHERE id = $1 RETURNING id",
+      [id],
+    );
+    if (!result.rows.length)
+      return handleError(res, 404, "Round not found", null, fn);
+    return handleSuccess(res, 200, "Round deleted successfully", { id }, fn);
+  } catch (err) {
+    return handleError(res, 500, "Failed to delete round", err, fn);
   }
 };

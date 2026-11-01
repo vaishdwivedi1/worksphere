@@ -3,26 +3,19 @@ import pool from "../config/postgres.js";
 
 const FN = "JobController";
 
-// ============================================
-// Normalize any value into a REAL string array (TEXT[])
-// ============================================
 const toTextArray = (v) => {
   if (v === null || v === undefined) return [];
-  if (Array.isArray(v)) {
+  if (Array.isArray(v))
     return v.map((x) => String(x).trim()).filter((x) => x.length > 0);
-  }
   if (typeof v === "string") {
     const s = v.trim();
     if (!s) return [];
     if (s.startsWith("[")) {
       try {
         const parsed = JSON.parse(s);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed))
           return parsed.map((x) => String(x).trim()).filter(Boolean);
-        }
-      } catch {
-        /* ignore */
-      }
+      } catch {}
     }
     return s
       .split(/\r?\n|,/)
@@ -32,9 +25,6 @@ const toTextArray = (v) => {
   return [];
 };
 
-// ============================================
-// hiring_workflow → array (JSONB)
-// ============================================
 const toWorkflowArray = (v) => {
   if (Array.isArray(v)) return v;
   if (typeof v === "string" && v.trim()) {
@@ -48,20 +38,16 @@ const toWorkflowArray = (v) => {
   return [];
 };
 
-// ============================================
-// screening_questions → array of { question, answer } (JSONB)
-// ============================================
 const toScreeningArray = (v) => {
   if (Array.isArray(v)) {
     return v
       .map((item) => {
         if (typeof item === "string") return { question: item, answer: "" };
-        if (item && typeof item === "object") {
+        if (item && typeof item === "object")
           return {
             question: (item.question || "").trim(),
             answer: (item.answer || "").trim(),
           };
-        }
         return null;
       })
       .filter((x) => x && x.question !== "");
@@ -70,16 +56,11 @@ const toScreeningArray = (v) => {
     try {
       const parsed = JSON.parse(v);
       if (Array.isArray(parsed)) return toScreeningArray(parsed);
-    } catch {
-      /* ignore */
-    }
+    } catch {}
   }
   return [];
 };
 
-// ============================================
-// CREATE JOB
-// ============================================
 export const createJob = async (req, res) => {
   const fn = `${FN}.createJob`;
   try {
@@ -135,9 +116,8 @@ export const createJob = async (req, res) => {
         approval_requested_by, approval_reason,
         approval_department, approval_team,
         status, total_rounds
-      ) VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20
-      ) RETURNING *`,
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+      RETURNING *`,
       [
         organization_id,
         created_by ?? null,
@@ -174,16 +154,13 @@ export const createJob = async (req, res) => {
   }
 };
 
-// ============================================
-// GET JOBS (list + filters + pagination) — TEAM filter instead of department
-// ============================================
 export const getJobs = async (req, res) => {
   const fn = `${FN}.getJobs`;
   try {
     const {
       organization_id,
       status,
-      team, // ← CHANGED: team instead of department
+      team,
       search,
       page = 1,
       limit = 20,
@@ -203,7 +180,6 @@ export const getJobs = async (req, res) => {
       conditions.push(`status = $${idx++}`);
       values.push(status);
     }
-    // ✅ TEAM filter instead of department
     if (team && team !== "all") {
       conditions.push(`team = $${idx++}`);
       values.push(team);
@@ -231,10 +207,7 @@ export const getJobs = async (req, res) => {
 
     values.push(limitNum, offset);
     const result = await pool.query(
-      `SELECT * FROM jobs
-       ${where}
-       ORDER BY ${sortCol} ${sortOrder}
-       LIMIT $${idx++} OFFSET $${idx++}`,
+      `SELECT * FROM jobs ${where} ORDER BY ${sortCol} ${sortOrder} LIMIT $${idx++} OFFSET $${idx++}`,
       values,
     );
 
@@ -258,33 +231,23 @@ export const getJobs = async (req, res) => {
   }
 };
 
-// ============================================
-// GET JOB BY ID
-// ============================================
 export const getJobById = async (req, res) => {
   const fn = `${FN}.getJobById`;
   try {
     const { id } = req.params;
-
     const jobResult = await pool.query("SELECT * FROM jobs WHERE id = $1", [
       id,
     ]);
-    if (jobResult.rows.length === 0) {
+    if (jobResult.rows.length === 0)
       return handleError(res, 404, "Job not found", null, fn);
-    }
 
     let statsResult = { rows: [] };
     try {
       statsResult = await pool.query(
-        `SELECT status, COUNT(*)::int AS count
-         FROM candidates
-         WHERE job_id = $1
-         GROUP BY status`,
+        `SELECT status, COUNT(*)::int AS count FROM candidates WHERE job_id = $1 GROUP BY status`,
         [id],
       );
-    } catch {
-      /* candidates table may not exist */
-    }
+    } catch {}
 
     return handleSuccess(
       res,
@@ -301,32 +264,23 @@ export const getJobById = async (req, res) => {
   }
 };
 
-// ============================================
-// UPDATE JOB
-// ============================================
 export const updateJob = async (req, res) => {
   const fn = `${FN}.updateJob`;
   try {
     const { id } = req.params;
     const updates = { ...req.body };
-
     delete updates.id;
     delete updates.organization_id;
     delete updates.created_at;
 
-    // TEXT[] columns
     if (updates.requirements !== undefined)
       updates.requirements = toTextArray(updates.requirements);
     if (updates.skills !== undefined)
       updates.skills = toTextArray(updates.skills);
-
-    // JSONB: screening_questions → [{question, answer}]
     if (updates.screening_questions !== undefined)
       updates.screening_questions = JSON.stringify(
         toScreeningArray(updates.screening_questions),
       );
-
-    // JSONB: hiring_workflow → array
     if (updates.hiring_workflow !== undefined) {
       const wf = toWorkflowArray(updates.hiring_workflow);
       updates.hiring_workflow = JSON.stringify(wf);
@@ -365,20 +319,16 @@ export const updateJob = async (req, res) => {
       }
     }
 
-    if (fields.length === 0) {
+    if (fields.length === 0)
       return handleError(res, 400, "No valid fields to update", null, fn);
-    }
 
     values.push(id);
-
     const result = await pool.query(
       `UPDATE jobs SET ${fields.join(", ")} WHERE id = $${idx} RETURNING *`,
       values,
     );
-
-    if (result.rows.length === 0) {
+    if (result.rows.length === 0)
       return handleError(res, 404, "Job not found", null, fn);
-    }
 
     return handleSuccess(
       res,
@@ -392,15 +342,11 @@ export const updateJob = async (req, res) => {
   }
 };
 
-// ============================================
-// UPDATE JOB STATUS (PATCH)
-// ============================================
 export const updateJobStatus = async (req, res) => {
   const fn = `${FN}.updateJobStatus`;
   try {
     const { id } = req.params;
     const { status } = req.body;
-
     const validStatuses = ["Draft", "Open", "Closed", "On Hold", "Filled"];
     if (!validStatuses.includes(status)) {
       return handleError(
@@ -411,16 +357,12 @@ export const updateJobStatus = async (req, res) => {
         fn,
       );
     }
-
     const result = await pool.query(
       "UPDATE jobs SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *",
       [status, id],
     );
-
-    if (result.rows.length === 0) {
+    if (result.rows.length === 0)
       return handleError(res, 404, "Job not found", null, fn);
-    }
-
     return handleSuccess(
       res,
       200,
@@ -433,9 +375,6 @@ export const updateJobStatus = async (req, res) => {
   }
 };
 
-// ============================================
-// DELETE JOB
-// ============================================
 export const deleteJob = async (req, res) => {
   const fn = `${FN}.deleteJob`;
   try {
@@ -444,11 +383,8 @@ export const deleteJob = async (req, res) => {
       "DELETE FROM jobs WHERE id = $1 RETURNING id",
       [id],
     );
-
-    if (result.rows.length === 0) {
+    if (result.rows.length === 0)
       return handleError(res, 404, "Job not found", null, fn);
-    }
-
     return handleSuccess(
       res,
       200,

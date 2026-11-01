@@ -1,7 +1,5 @@
 const APIPATHS = {
-  // ============================================
-  // AUTH (existing)
-  // ============================================
+  // AUTH
   verifyOrganization: "/worksphere/api/v1/organization/verify-otp",
   createOrganization: "/worksphere/api/v1/organization/create",
   login: "/worksphere/api/v1/auth/login",
@@ -11,9 +9,7 @@ const APIPATHS = {
   verifyMemberInvitationLink:
     "/worksphere/api/v1/organization/member/verify-invitation-link",
 
-  // ============================================
-  // MEMBERS (existing)
-  // ============================================
+  // MEMBERS
   getAllMember: "/worksphere/api/v1/organization/members",
   addMember: "/worksphere/api/v1/organization/member/add",
   updateMember: "/worksphere/api/v1/organization/member/update",
@@ -22,9 +18,7 @@ const APIPATHS = {
   generateMemberInvitationLink:
     "/worksphere/api/v1/organization/member/generate-invitation-link",
 
-  // ============================================
-  // TEAMS (existing)
-  // ============================================
+  // TEAMS
   getAllTeams: "/worksphere/api/v1/organization/teams",
   getTeamById: "/worksphere/api/v1/organization/team",
   createTeam: "/worksphere/api/v1/organization/team/create",
@@ -34,9 +28,7 @@ const APIPATHS = {
   addTeamMember: "/worksphere/api/v1/organization/team/members/add",
   removeTeamMember: "/worksphere/api/v1/organization/team/members/remove",
 
-  // ============================================
   // JOBS
-  // ============================================
   createJob: "/worksphere/api/v1/jobs/create",
   getAllJobs: "/worksphere/api/v1/jobs",
   getJobById: "/worksphere/api/v1/jobs/:id",
@@ -44,9 +36,7 @@ const APIPATHS = {
   updateJobStatus: "/worksphere/api/v1/jobs/update-status/:id",
   deleteJob: "/worksphere/api/v1/jobs/delete/:id",
 
-  // ============================================
   // CANDIDATES
-  // ============================================
   createCandidate: "/worksphere/api/v1/candidates/create",
   getAllCandidates: "/worksphere/api/v1/candidates",
   getCandidateById: "/worksphere/api/v1/candidates/:id",
@@ -54,9 +44,12 @@ const APIPATHS = {
   updateCandidateStatus: "/worksphere/api/v1/candidates/update-status/:id",
   deleteCandidate: "/worksphere/api/v1/candidates/delete/:id",
 
-  // ============================================
+  // CANDIDATE ROUNDS
+  createRound: "/worksphere/api/v1/candidates/round/create",
+  updateRound: "/worksphere/api/v1/candidates/round/update/:id",
+  deleteRound: "/worksphere/api/v1/candidates/round/delete/:id",
+
   // INTERVIEWS
-  // ============================================
   createInterview: "/worksphere/api/v1/interviews/create",
   getInterviewsByCandidate:
     "/worksphere/api/v1/interviews/candidate/:candidateId",
