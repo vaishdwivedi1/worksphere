@@ -221,11 +221,13 @@ export const applyLeave = async (req, res) => {
       return handleError(res, 400, "Missing required fields", null, fn);
     }
 
-    const memberCheck = await pool.query(
+    const memberCheck = await client.query(
       `SELECT id FROM organization_members
-       WHERE id = $1 AND organization_id = $2`,
-      [employee_id, organization_id],
+       WHERE organization_id = $1 AND (user_id = $2 OR id = $2)
+       LIMIT 1`,
+      [organization_id, employee_id],
     );
+
     if (memberCheck.rows.length === 0) {
       return handleError(
         res,
@@ -236,7 +238,9 @@ export const applyLeave = async (req, res) => {
       );
     }
 
-    const ltRes = await pool.query(
+    const memberId = memberCheck.rows[0].id;
+
+    const ltRes = await client.query(
       `SELECT * FROM leave_types
        WHERE id = $1 AND organization_id = $2 AND is_active = TRUE`,
       [leave_type_id, organization_id],
@@ -250,6 +254,10 @@ export const applyLeave = async (req, res) => {
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
       return handleError(res, 400, "Invalid date format", null, fn);
     }
+    if (end < start) {
+      return handleError(res, 400, "end_date must be >= start_date", null, fn);
+    }
+
     const diffMs = end.getTime() - start.getTime();
     let days = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1;
     if (is_half_day) days = 0.5;
@@ -259,7 +267,7 @@ export const applyLeave = async (req, res) => {
        WHERE employee_id = $1
          AND status IN ('Pending','Approved')
          AND (start_date <= $3 AND end_date >= $2)`,
-      [employee_id, start_date, end_date],
+      [memberId, start_date, end_date],
     );
     if (overlap.rows.length > 0) {
       return handleError(
@@ -271,7 +279,6 @@ export const applyLeave = async (req, res) => {
       );
     }
 
-    // Normalize half_day_session to what the DB CHECK accepts ('AM'|'PM'|null)
     let normalizedHalfDaySession = null;
     if (is_half_day && half_day_session) {
       const s = String(half_day_session).trim();
@@ -289,7 +296,7 @@ export const applyLeave = async (req, res) => {
        RETURNING *`,
       [
         organization_id,
-        employee_id,
+        memberId,
         leave_type_id,
         start_date,
         end_date,
@@ -324,7 +331,7 @@ export const applyLeave = async (req, res) => {
         return handleError(
           res,
           400,
-          "Employee record not found in this organization. Please re-login.",
+          "Invalid employee reference. Please re-login and try again.",
           null,
           fn,
         );
@@ -365,7 +372,6 @@ export const getAllLeaves = async (req, res) => {
       orgId,
       employeeId,
       department,
-      team,
       leaveTypeId,
       status,
       startDate,
@@ -386,8 +392,15 @@ export const getAllLeaves = async (req, res) => {
     let idx = 2;
 
     if (employeeId) {
-      conditions.push(`l.employee_id = $${idx++}`);
+      conditions.push(
+        `l.employee_id = (
+           SELECT id FROM organization_members
+           WHERE organization_id = $1 AND user_id = $${idx}
+           LIMIT 1
+         )`,
+      );
       params.push(employeeId);
+      idx++;
     }
     if (leaveTypeId) {
       conditions.push(`l.leave_type_id = $${idx++}`);
@@ -454,12 +467,26 @@ export const getAllLeaves = async (req, res) => {
       pool.query(countQuery, params),
     ]);
 
+    // return res.status(200).json({
+    //   success: true,
+    //   statusCode: 200,
+    //   message: "Leaves fetched successfully",
+    //   data: dataRes.rows,
+    //   pagination: {
+    //     total: parseInt(countRes.rows[0].count),
+    //     page: parseInt(page),
+    //     limit: parseInt(limit),
+    //     totalPages: Math.ceil(countRes.rows[0].count / limit),
+    //   },
+    //   timestamp: new Date().toISOString(),
+    // });
+
     return handleSuccess(
       res,
       200,
       "Leaves fetched successfully",
       {
-        data: dataRes.rows,
+        leaves: dataRes.rows,
         pagination: {
           total: parseInt(countRes.rows[0].count),
           page: parseInt(page),
@@ -518,6 +545,29 @@ const actionLeave = async (req, res, action) => {
     const { id } = req.params;
     const { member_id, comment } = req.body;
 
+    let resolvedMemberId = null;
+    if (action !== "cancel" && member_id) {
+      const resolve = await pool.query(
+        `SELECT om.id
+         FROM organization_members om
+         JOIN leaves l ON l.organization_id = om.organization_id
+         WHERE l.id = $1
+           AND (om.id = $2 OR om.user_id = $2)
+         LIMIT 1`,
+        [id, member_id],
+      );
+      if (resolve.rows.length === 0) {
+        return handleError(
+          res,
+          400,
+          "Invalid approver member. Please re-login.",
+          null,
+          fn,
+        );
+      }
+      resolvedMemberId = resolve.rows[0].id;
+    }
+
     let updateCol = "";
     let statusVal = "";
     if (action === "approve") {
@@ -544,7 +594,7 @@ const actionLeave = async (req, res, action) => {
     const params =
       action === "cancel"
         ? [id, null, comment || null]
-        : [id, member_id, comment || null];
+        : [id, resolvedMemberId, comment || null];
 
     const result = await pool.query(query, params);
     if (result.rows.length === 0) {

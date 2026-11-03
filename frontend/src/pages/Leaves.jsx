@@ -315,7 +315,7 @@ const Leaves = () => {
       const res = await api.get(
         `${APIPATHS.getAllLeaves}?${params.toString()}`,
       );
-      const list = Array.isArray(res?.data) ? res.data : [];
+      const list = Array.isArray(res?.data?.leaves) ? res.data?.leaves : [];
       setLeaves(list.map(mapLeave));
       if (res?.pagination) setPagination(res.pagination);
     } catch (err) {
