@@ -1,47 +1,38 @@
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-  useRef,
-} from "react";
 import {
-  Search,
-  Plus,
-  Filter,
-  Edit,
-  Trash2,
-  Archive,
-  XCircle,
-  CheckCircle,
-  Clock,
-  Users,
-  Briefcase,
-  MapPin,
-  Calendar,
-  Building,
-  Phone,
-  FileText,
-  Send,
-  UserCheck,
-  Award,
   AlertCircle,
-  Play,
-  Pause,
-  Circle,
+  Archive,
+  Award,
+  Briefcase,
+  Building,
+  Calendar,
   Check,
-  X,
-  Loader2,
-  RefreshCw,
-  PlusCircle,
-  MinusCircle,
-  Globe,
-  DollarSign,
-  Upload,
+  CheckCircle,
   ChevronDown,
   ChevronUp,
-  Star,
+  Circle,
+  Clock,
+  DollarSign,
+  Edit,
+  FileText,
+  Filter,
+  Globe,
+  Loader2,
+  MapPin,
+  MinusCircle,
+  Pause,
+  Phone,
+  Play,
+  Plus,
+  PlusCircle,
+  Search,
+  Send,
+  Trash2,
+  UserCheck,
+  Users,
+  X,
+  XCircle,
 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { api } from "../services/api";
 import APIPATHS from "../utils/APIPATHS";
@@ -1140,35 +1131,6 @@ const HRJobs = () => {
                       </li>
                     ))}
                   </ul>
-                </div>
-              )}
-
-              {selectedJob.hiringWorkflow.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-700 mb-2">
-                    Hiring Workflow
-                  </h4>
-                  <div className="space-y-2">
-                    {selectedJob.hiringWorkflow.map((round, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg"
-                      >
-                        <span className="flex items-center justify-center w-6 h-6 bg-emerald-600 text-white rounded-full text-xs font-bold">
-                          {i + 1}
-                        </span>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-800">
-                            {round?.name || `Round ${i + 1}`}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {round?.interviewer || "—"} • {round?.type || "—"} •{" "}
-                            {round?.duration || "—"}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               )}
 

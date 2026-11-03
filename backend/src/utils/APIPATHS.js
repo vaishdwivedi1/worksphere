@@ -5,6 +5,7 @@ const APIPATHS = {
   changePassword: "/v1/auth/change-password",
   logout: "/v1/auth/logout",
   refreshToken: "/v1/auth/refresh-token",
+  me: "/v1/auth/me",
 
   // ORGANIZATION
   createOrganization: "/v1/organization/create",
@@ -54,6 +55,21 @@ const APIPATHS = {
   getInterviewsByCandidate: "/v1/interviews/candidate/:candidateId",
   updateInterview: "/v1/interviews/update/:id",
   deleteInterview: "/v1/interviews/delete/:id",
+
+  // LEAVES
+  createLeaveType: "/v1/leaves/types/create",
+  getAllLeaveTypes: "/v1/leaves/types",
+  getLeaveTypeById: "/v1/leaves/types/:id",
+  updateLeaveType: "/v1/leaves/types/update/:id",
+  deleteLeaveType: "/v1/leaves/types/delete/:id",
+
+  applyLeave: "/v1/leaves/apply",
+  getAllLeaves: "/v1/leaves",
+  getLeaveById: "/v1/leaves/:id",
+  approveLeave: "/v1/leaves/approve/:id",
+  rejectLeave: "/v1/leaves/reject/:id",
+  cancelLeave: "/v1/leaves/cancel/:id",
+  updateLeave: "/v1/leaves/update/:id",
 };
 
 export default APIPATHS;

@@ -12,6 +12,7 @@ import Settings from "../pages/Settings";
 import AcceptInvitation from "../pages/AcceptInvitation";
 import HRJobs from "../pages/HRJobs";
 import Teams from "../pages/Teams";
+import Leaves from "../pages/Leaves";
 
 // ============================================
 // ERROR BOUNDARY
@@ -104,6 +105,7 @@ const Routing = () => {
             <Route path={STATICPATHS.settings} element={<Settings />} />
             <Route path={STATICPATHS.jobs} element={<HRJobs />} />
             <Route path={STATICPATHS.teams} element={<Teams />} />
+            <Route path={STATICPATHS.leave} element={<Leaves />} />
           </Route>
 
           {/* 404 Route */}

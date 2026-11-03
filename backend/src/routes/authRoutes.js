@@ -11,6 +11,8 @@ import {
 } from "../controllers/authControllers.js";
 import APIPATHS from "../utils/APIPATHS.js";
 
+import verifyToken from "../middlewares/authMiddleware.js";
+
 const router = express.Router();
 
 router.post(APIPATHS.login, loginUser);
@@ -26,5 +28,7 @@ router.post(APIPATHS.changePassword, changePassword);
 router.post(APIPATHS.logout, logout);
 
 router.post(APIPATHS.refreshToken, refreshToken);
+
+router.post(APIPATHS.logout, verifyToken, logout);
 
 export default router;

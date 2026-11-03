@@ -326,4 +326,121 @@ export const createTables = async () => {
     console.error("Error creating tables:", error.message);
     throw error;
   }
+
+  // ============================================
+  // 8. leave_types
+  // ============================================
+  await pool.query(`
+  CREATE TABLE IF NOT EXISTS leave_types (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    max_days_per_year INTEGER NOT NULL DEFAULT 0,
+    carry_forward_allowed BOOLEAN NOT NULL DEFAULT FALSE,
+    is_paid BOOLEAN NOT NULL DEFAULT TRUE,
+    requires_approval BOOLEAN NOT NULL DEFAULT TRUE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_org_leave_type UNIQUE (organization_id, name)
+  );
+`);
+
+  await pool.query(`
+  CREATE INDEX IF NOT EXISTS idx_leave_types_org_id ON leave_types (organization_id);
+`);
+
+  await pool.query(`
+  CREATE OR REPLACE FUNCTION update_leave_types_updated_at()
+  RETURNS TRIGGER AS $$
+  BEGIN NEW.updated_at = CURRENT_TIMESTAMP; RETURN NEW; END;
+  $$ LANGUAGE plpgsql;
+`);
+  await pool.query(
+    `DROP TRIGGER IF EXISTS trg_leave_types_updated_at ON leave_types;`,
+  );
+  await pool.query(`
+  CREATE TRIGGER trg_leave_types_updated_at
+  BEFORE UPDATE ON leave_types FOR EACH ROW EXECUTE FUNCTION update_leave_types_updated_at();
+`);
+
+  // ============================================
+  // 9. leaves
+  // ============================================
+  await pool.query(`
+  CREATE TABLE IF NOT EXISTS leaves (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    employee_id UUID NOT NULL REFERENCES organization_members(id) ON DELETE CASCADE,
+    leave_type_id UUID NOT NULL REFERENCES leave_types(id) ON DELETE RESTRICT,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    number_of_days NUMERIC(5,2) NOT NULL DEFAULT 0,
+    is_half_day BOOLEAN NOT NULL DEFAULT FALSE,
+    half_day_session VARCHAR(10),
+    is_wfh BOOLEAN NOT NULL DEFAULT FALSE,
+    reason TEXT NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'Pending',
+    applied_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    approved_by UUID REFERENCES organization_members(id) ON DELETE SET NULL,
+    rejected_by UUID REFERENCES organization_members(id) ON DELETE SET NULL,
+    actioned_at TIMESTAMP,
+    approval_comment TEXT,
+    attachments JSONB DEFAULT '[]'::jsonb,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT valid_leave_status CHECK (status IN ('Pending','Approved','Rejected','Cancelled')),
+    CONSTRAINT valid_half_day_session CHECK (half_day_session IS NULL OR half_day_session IN ('AM','PM')),
+    CONSTRAINT valid_leave_dates CHECK (end_date >= start_date)
+  );
+`);
+
+  const leaveAlters = [
+    `ALTER TABLE leaves ADD COLUMN IF NOT EXISTS is_half_day BOOLEAN NOT NULL DEFAULT FALSE;`,
+    `ALTER TABLE leaves ADD COLUMN IF NOT EXISTS half_day_session VARCHAR(10);`,
+    `ALTER TABLE leaves ADD COLUMN IF NOT EXISTS is_wfh BOOLEAN NOT NULL DEFAULT FALSE;`,
+    `ALTER TABLE leaves ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'::jsonb;`,
+  ];
+  for (const sql of leaveAlters) {
+    try {
+      await pool.query(sql);
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_leaves_org_id ON leaves (organization_id);`,
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_leaves_employee_id ON leaves (employee_id);`,
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_leaves_leave_type_id ON leaves (leave_type_id);`,
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_leaves_status ON leaves (status);`,
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_leaves_dates ON leaves (start_date, end_date);`,
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_leaves_applied_date ON leaves (applied_date DESC);`,
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_leaves_org_status ON leaves (organization_id, status);`,
+  );
+
+  await pool.query(`
+  CREATE OR REPLACE FUNCTION update_leaves_updated_at()
+  RETURNS TRIGGER AS $$
+  BEGIN NEW.updated_at = CURRENT_TIMESTAMP; RETURN NEW; END;
+  $$ LANGUAGE plpgsql;
+`);
+  await pool.query(`DROP TRIGGER IF EXISTS trg_leaves_updated_at ON leaves;`);
+  await pool.query(`
+  CREATE TRIGGER trg_leaves_updated_at
+  BEFORE UPDATE ON leaves FOR EACH ROW EXECUTE FUNCTION update_leaves_updated_at();
+`);
 };

@@ -55,6 +55,21 @@ const APIPATHS = {
     "/worksphere/api/v1/interviews/candidate/:candidateId",
   updateInterview: "/worksphere/api/v1/interviews/update/:id",
   deleteInterview: "/worksphere/api/v1/interviews/delete/:id",
+
+  // LEAVES
+  createLeaveType: "/worksphere/api/v1/leaves/types/create",
+  getAllLeaveTypes: "/worksphere/api/v1/leaves/types",
+  getLeaveTypeById: "/worksphere/api/v1/leaves/types/:id",
+  updateLeaveType: "/worksphere/api/v1/leaves/types/update/:id",
+  deleteLeaveType: "/worksphere/api/v1/leaves/types/delete/:id",
+
+  applyLeave: "/worksphere/api/v1/leaves/apply",
+  getAllLeaves: "/worksphere/api/v1/leaves",
+  getLeaveById: "/worksphere/api/v1/leaves/:id",
+  approveLeave: "/worksphere/api/v1/leaves/approve/:id",
+  rejectLeave: "/worksphere/api/v1/leaves/reject/:id",
+  cancelLeave: "/worksphere/api/v1/leaves/cancel/:id",
+  updateLeave: "/worksphere/api/v1/leaves/update/:id",
 };
 
 export default APIPATHS;
