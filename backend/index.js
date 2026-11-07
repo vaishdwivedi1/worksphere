@@ -11,9 +11,10 @@ import teamRoutes from "./src/routes/teamRoutes.js";
 import jobRoutes from "./src/routes/jobRoutes.js";
 import candidateRoutes from "./src/routes/candidateRoutes.js";
 import interviewRoutes from "./src/routes/interviewRoutes.js";
-import { resetDatabase } from "./src/commonFunctions/reset-database.js";
+// import { resetDatabase } from "./src/commonFunctions/reset-database.js";
 import { createTables } from "./src/postgresDatabase.js/database.js";
 import leaveRoutes from "./src/routes/leaveRoutes.js";
+import requestRoutes from "./src/routes/requestRoutes.js";
 
 dotenv.config();
 
@@ -38,6 +39,7 @@ app.use("/worksphere/api", jobRoutes);
 app.use("/worksphere/api", candidateRoutes);
 app.use("/worksphere/api", interviewRoutes);
 app.use("/worksphere/api", leaveRoutes);
+app.use("/worksphere/api", requestRoutes);
 
 // Health check
 app.get("/", (req, res) => {

@@ -2,7 +2,7 @@ const STATICPATHS = {
   // Auth & Public
   registerOrganization: "/register-organization",
   login: "/login",
-  acceptInvitation:"/accept-invitation",
+  acceptInvitation: "/accept-invitation",
 
   // Core
   dashboard: "/dashboard",
@@ -16,6 +16,7 @@ const STATICPATHS = {
   leave: "/leave",
   announcements: "/announcements",
   jobs: "/jobs",
+  requests: "/requests",
   hrReports: "/hr-reports",
 
   // Sales

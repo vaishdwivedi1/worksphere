@@ -70,6 +70,16 @@ const APIPATHS = {
   rejectLeave: "/v1/leaves/reject/:id",
   cancelLeave: "/v1/leaves/cancel/:id",
   updateLeave: "/v1/leaves/update/:id",
+
+  // REQUESTS
+  createRequest: "/v1/requests/create",
+  getAllRequests: "/v1/requests",
+  getRequestById: "/v1/requests/:id",
+  updateRequest: "/v1/requests/update/:id",
+  deleteRequest: "/v1/requests/delete/:id",
+  closeRequest: "/v1/requests/close/:id",
+  addRequestComment: "/v1/requests/:id/comments",
+  getRequestComments: "/v1/requests/:id/comments",
 };
 
 export default APIPATHS;

@@ -70,6 +70,16 @@ const APIPATHS = {
   rejectLeave: "/worksphere/api/v1/leaves/reject/:id",
   cancelLeave: "/worksphere/api/v1/leaves/cancel/:id",
   updateLeave: "/worksphere/api/v1/leaves/update/:id",
+
+  // REQUESTS
+  createRequest: "/worksphere/api/v1/requests/create",
+  getAllRequests: "/worksphere/api/v1/requests",
+  getRequestById: "/worksphere/api/v1/requests/:id",
+  updateRequest: "/worksphere/api/v1/requests/update/:id",
+  deleteRequest: "/worksphere/api/v1/requests/delete/:id",
+  closeRequest: "/worksphere/api/v1/requests/close/:id",
+  addRequestComment: "/worksphere/api/v1/requests/:id/comments",
+  getRequestComments: "/worksphere/api/v1/requests/:id/comments",
 };
 
 export default APIPATHS;

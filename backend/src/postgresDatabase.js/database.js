@@ -443,4 +443,103 @@ export const createTables = async () => {
   CREATE TRIGGER trg_leaves_updated_at
   BEFORE UPDATE ON leaves FOR EACH ROW EXECUTE FUNCTION update_leaves_updated_at();
 `);
+
+  // ============================================
+  // 10. requests
+  // ============================================
+  await pool.query(`
+  CREATE TABLE IF NOT EXISTS requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    created_by UUID NOT NULL REFERENCES organization_members(id) ON DELETE CASCADE,
+    assigned_to UUID REFERENCES organization_members(id) ON DELETE SET NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    category VARCHAR(50) NOT NULL DEFAULT 'General',
+    status VARCHAR(50) NOT NULL DEFAULT 'Open',
+    priority VARCHAR(20) NOT NULL DEFAULT 'Medium',
+    attachments JSONB DEFAULT '[]'::jsonb,
+    resolution TEXT,
+    resolved_by UUID REFERENCES organization_members(id) ON DELETE SET NULL,
+    resolved_at TIMESTAMP,
+    closed_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT valid_request_category CHECK (category IN ('Leave','Payroll','Documents','Equipment','Policy','IT Support','General')),
+    CONSTRAINT valid_request_status CHECK (status IN ('Open','Pending','In Review','Resolved','Rejected','Closed')),
+    CONSTRAINT valid_request_priority CHECK (priority IN ('Low','Medium','High','Urgent'))
+  );
+`);
+
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_requests_org_id ON requests (organization_id);`,
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_requests_created_by ON requests (created_by);`,
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_requests_assigned_to ON requests (assigned_to);`,
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_requests_status ON requests (status);`,
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_requests_category ON requests (category);`,
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_requests_created_at ON requests (created_at DESC);`,
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_requests_org_status ON requests (organization_id, status);`,
+  );
+
+  await pool.query(`
+  CREATE OR REPLACE FUNCTION update_requests_updated_at()
+  RETURNS TRIGGER AS $$
+  BEGIN NEW.updated_at = CURRENT_TIMESTAMP; RETURN NEW; END;
+  $$ LANGUAGE plpgsql;
+`);
+  await pool.query(
+    `DROP TRIGGER IF EXISTS trg_requests_updated_at ON requests;`,
+  );
+  await pool.query(`
+  CREATE TRIGGER trg_requests_updated_at
+  BEFORE UPDATE ON requests FOR EACH ROW EXECUTE FUNCTION update_requests_updated_at();
+`);
+
+  // ============================================
+  // 11. request_comments
+  // ============================================
+  await pool.query(`
+  CREATE TABLE IF NOT EXISTS request_comments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    request_id UUID NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
+    author_id UUID NOT NULL REFERENCES organization_members(id) ON DELETE CASCADE,
+    comment TEXT NOT NULL,
+    is_internal BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_request_comments_request_id ON request_comments (request_id);`,
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_request_comments_created_at ON request_comments (created_at ASC);`,
+  );
+
+  await pool.query(`
+  CREATE OR REPLACE FUNCTION update_request_comments_updated_at()
+  RETURNS TRIGGER AS $$
+  BEGIN NEW.updated_at = CURRENT_TIMESTAMP; RETURN NEW; END;
+  $$ LANGUAGE plpgsql;
+`);
+  await pool.query(
+    `DROP TRIGGER IF EXISTS trg_request_comments_updated_at ON request_comments;`,
+  );
+  await pool.query(`
+  CREATE TRIGGER trg_request_comments_updated_at
+  BEFORE UPDATE ON request_comments FOR EACH ROW EXECUTE FUNCTION update_request_comments_updated_at();
+`);
 };
