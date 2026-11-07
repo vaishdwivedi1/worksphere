@@ -87,6 +87,13 @@ const APIPATHS = {
   updateAnnouncement: "/v1/announcements/update/:id",
   deleteAnnouncement: "/v1/announcements/delete/:id",
   archiveAnnouncement: "/v1/announcements/archive/:id",
+
+  // TODO
+  createTodo: "/v1/todos/create",
+  getAllTodo: "/v1/todos",
+  getTodoById: "/v1/todos/:id",
+  updateTodo: "/v1/todos/update/:id",
+  deleteTodo: "/v1/todos/delete/:id",
 };
 
 export default APIPATHS;

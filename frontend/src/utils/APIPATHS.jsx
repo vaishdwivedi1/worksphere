@@ -87,6 +87,13 @@ const APIPATHS = {
   updateAnnouncement: "/worksphere/api/v1/announcements/update/:id",
   deleteAnnouncement: "/worksphere/api/v1/announcements/delete/:id",
   archiveAnnouncement: "/worksphere/api/v1/announcements/archive/:id",
+
+  // TODOS
+  createTodo: "/worksphere/api/v1/todos/create",
+  getAllTodos: "/worksphere/api/v1/todos",
+  getTodoById: "/worksphere/api/v1/todos/:id",
+  updateTodo: "/worksphere/api/v1/todos/update/:id",
+  deleteTodo: "/worksphere/api/v1/todos/delete/:id",
 };
 
 export default APIPATHS;

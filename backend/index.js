@@ -4,6 +4,7 @@ import cors from "cors";
 
 import connectMongoDB from "./src/config/mongodb.js";
 import pool from "./src/config/postgres.js";
+// import { resetDatabase } from "./src/commonFunctions/reset-database.js";
 
 import authRoutes from "./src/routes/authRoutes.js";
 import memberRoutes from "./src/routes/memberRoutes.js";
@@ -11,11 +12,11 @@ import teamRoutes from "./src/routes/teamRoutes.js";
 import jobRoutes from "./src/routes/jobRoutes.js";
 import candidateRoutes from "./src/routes/candidateRoutes.js";
 import interviewRoutes from "./src/routes/interviewRoutes.js";
-// import { resetDatabase } from "./src/commonFunctions/reset-database.js";
 import { createTables } from "./src/postgresDatabase.js/database.js";
 import leaveRoutes from "./src/routes/leaveRoutes.js";
 import requestRoutes from "./src/routes/requestRoutes.js";
 import announcementRoutes from "./src/routes/announcementRoutes.js";
+import todoRoutes from "./src/routes/todosRoutes.js";
 
 dotenv.config();
 
@@ -42,6 +43,7 @@ app.use("/worksphere/api", interviewRoutes);
 app.use("/worksphere/api", leaveRoutes);
 app.use("/worksphere/api", requestRoutes);
 app.use("/worksphere/api", announcementRoutes);
+app.use("/worksphere/api", todoRoutes);
 
 // Health check
 app.get("/", (req, res) => {

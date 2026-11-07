@@ -587,4 +587,48 @@ export const createTables = async () => {
     CREATE TRIGGER trg_announcements_updated_at
     BEFORE UPDATE ON announcements FOR EACH ROW EXECUTE FUNCTION update_announcements_updated_at();
   `);
+
+  // ============================================
+  // 13. todos
+  // ============================================
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS todos (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      created_by UUID NOT NULL REFERENCES organization_members(id) ON DELETE CASCADE,
+      title VARCHAR(255) NOT NULL,
+      description TEXT,
+      priority VARCHAR(50) NOT NULL DEFAULT 'Medium',
+      due_date TIMESTAMP,
+      status VARCHAR(50) NOT NULL DEFAULT 'Pending',
+      notes TEXT,
+      attachments JSONB DEFAULT '[]'::jsonb,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT valid_todo_status CHECK (status IN ('Pending', 'In Progress', 'Completed', 'Draft')),
+      CONSTRAINT valid_todo_priority CHECK (priority IN ('Low', 'Medium', 'High', 'Urgent'))
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_todos_org_id ON todos (organization_id);
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_todos_created_by ON todos (created_by);
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_todos_status ON todos (status);
+  `);
+
+  await pool.query(`
+    CREATE OR REPLACE FUNCTION update_todos_updated_at()
+    RETURNS TRIGGER AS $$
+    BEGIN NEW.updated_at = CURRENT_TIMESTAMP; RETURN NEW; END;
+    $$ LANGUAGE plpgsql;
+  `);
+  await pool.query(`DROP TRIGGER IF EXISTS trg_todos_updated_at ON todos;`);
+  await pool.query(`
+    CREATE TRIGGER trg_todos_updated_at
+    BEFORE UPDATE ON todos FOR EACH ROW EXECUTE FUNCTION update_todos_updated_at();
+  `);
 };

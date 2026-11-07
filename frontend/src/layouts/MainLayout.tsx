@@ -113,6 +113,7 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         { icon: Settings, label: "Settings", path: STATICPATHS.settings },
         { icon: Calendar, label: "Leave", path: STATICPATHS.leave },
         { icon: Calendar, label: "Requests", path: STATICPATHS.requests },
+        { icon: Calendar, label: "Todos", path: STATICPATHS.todo },
       ],
       admin: [
         {
