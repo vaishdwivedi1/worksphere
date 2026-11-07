@@ -542,4 +542,49 @@ export const createTables = async () => {
   CREATE TRIGGER trg_request_comments_updated_at
   BEFORE UPDATE ON request_comments FOR EACH ROW EXECUTE FUNCTION update_request_comments_updated_at();
 `);
+
+  // ============================================
+  // 12. announcements
+  // ============================================
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS announcements (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      created_by UUID NOT NULL REFERENCES organization_members(id) ON DELETE CASCADE,
+      title VARCHAR(255) NOT NULL,
+      description TEXT NOT NULL,
+      type VARCHAR(50) NOT NULL DEFAULT 'General',
+      recipient_type VARCHAR(50) NOT NULL DEFAULT 'Entire Organization',
+      target_department VARCHAR(100),
+      target_team_id UUID, -- Assuming a teams table exists, we just store the ID or name
+      target_member_ids JSONB DEFAULT '[]'::jsonb,
+      status VARCHAR(50) NOT NULL DEFAULT 'Active',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT valid_announcement_type CHECK (type IN ('General', 'HR', 'Holiday', 'Policy Update', 'Event', 'Emergency')),
+      CONSTRAINT valid_recipient_type CHECK (recipient_type IN ('Entire Organization', 'Department', 'Team', 'Individual Employees')),
+      CONSTRAINT valid_announcement_status CHECK (status IN ('Active', 'Archived'))
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_announcements_org_id ON announcements (organization_id);
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_announcements_status ON announcements (status);
+  `);
+
+  await pool.query(`
+    CREATE OR REPLACE FUNCTION update_announcements_updated_at()
+    RETURNS TRIGGER AS $$
+    BEGIN NEW.updated_at = CURRENT_TIMESTAMP; RETURN NEW; END;
+    $$ LANGUAGE plpgsql;
+  `);
+  await pool.query(
+    `DROP TRIGGER IF EXISTS trg_announcements_updated_at ON announcements;`,
+  );
+  await pool.query(`
+    CREATE TRIGGER trg_announcements_updated_at
+    BEFORE UPDATE ON announcements FOR EACH ROW EXECUTE FUNCTION update_announcements_updated_at();
+  `);
 };

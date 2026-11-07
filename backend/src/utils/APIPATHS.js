@@ -80,6 +80,13 @@ const APIPATHS = {
   closeRequest: "/v1/requests/close/:id",
   addRequestComment: "/v1/requests/:id/comments",
   getRequestComments: "/v1/requests/:id/comments",
+
+  // ANNOUNCEMENTS
+  createAnnouncement: "/v1/announcements/create",
+  getAllAnnouncements: "/v1/announcements",
+  updateAnnouncement: "/v1/announcements/update/:id",
+  deleteAnnouncement: "/v1/announcements/delete/:id",
+  archiveAnnouncement: "/v1/announcements/archive/:id",
 };
 
 export default APIPATHS;

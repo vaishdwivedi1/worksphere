@@ -80,6 +80,13 @@ const APIPATHS = {
   closeRequest: "/worksphere/api/v1/requests/close/:id",
   addRequestComment: "/worksphere/api/v1/requests/:id/comments",
   getRequestComments: "/worksphere/api/v1/requests/:id/comments",
+
+  // ANNOUNCEMENTS
+  createAnnouncement: "/worksphere/api/v1/announcements/create",
+  getAllAnnouncements: "/worksphere/api/v1/announcements",
+  updateAnnouncement: "/worksphere/api/v1/announcements/update/:id",
+  deleteAnnouncement: "/worksphere/api/v1/announcements/delete/:id",
+  archiveAnnouncement: "/worksphere/api/v1/announcements/archive/:id",
 };
 
 export default APIPATHS;
